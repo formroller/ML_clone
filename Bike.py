@@ -80,13 +80,25 @@ sns.barplot(data=dataTypeDf,x='variableType',y='count',ax=ax)
 ax.set(xlabel = 'variableTypeariable Type', ylabel = 'Count', title = 'Variables DataType Count')
 
 # =============================================================================
-# Missing Values Analysis
+# Missing Values Analysis 
 # =============================================================================
 msno.matrix(dailyDate, figsize = (12,5))
+# ==> 결측치 없음
 
 # =============================================================================
 # Outliers Analysis
 # =============================================================================
+fig, axes = plt.subplots(nrows = 2, ncols = 2)
+fig.set_size_inches(12,10)
+sns.boxplot(data=dailyDate, y='count', orient='v', ax=axes[0][0])  # orinet = 'v', vertical(세로방향)
+sns.boxplot(data=dailyDate, y='count',x='season', orient='v',ax=axes[0][1])
+sns.boxplot(data=dailyDate, y='count',x='hour', orient='v', ax=axes[1][0])
+sns.boxplot(data=dailyDate, y='count',x='workingday', orient='v', ax=axes[1][1])
+
+axes[0][0].set(ylabel='Count', title='Box Plots On Count')
+axes[0][1].set(xlabel='Season', title='Box Plot On Count Axross Hour Of The Day')
+axes[1][0].set(xlabel='hour Of The Day', ylabel='Count', title='Box polt On Count Across Hour Of The Day')
+axes[1][1].set(xlabel='Working Day', ylabel='Count', title='Box Plot On Xount Across Working Day')
 
 # =============================================================================
 # 부록
@@ -98,4 +110,8 @@ import pylab
 import calendar
  - 달력 출력하는 모듈.(월요일을 처음, 일요일을 마지막)
  https://python.flowdas.com/library/calendar.html (참고)
+ 
+sns.boxplot(kwargs)
+https://buillee.tistory.com/198
+ 
  
