@@ -1,14 +1,17 @@
 # =============================================================================
 # (Kaggle) Bike Sharing Demand
 # =============================================================================
-https://www.kaggle.com/viveksrinivasan/eda-ensemble-model-top-10-percentile
+# https://www.kaggle.com/viveksrinivasan/eda-ensemble-model-top-10-percentile
 # path
 import os
 os.getcwd()
-os.chdir('./kaggle/bike')
+os.chdir('./.spyder-py3/kaggle/bike')
+
+# os.path.dirname(os.path.abspath('__Bike.py__'))  # 절대경로
+
 
 # import library
-import pylab # 
+import pylab
 import calendar
 import numpy as np
 import pandas as pd
@@ -37,10 +40,10 @@ dailyDate.info()
 
 
 # Feature Engineering
-일부 열 범주화(season, holiday, workingday, weather)
- - 'datetime'컬럼에서 'date', 'hour','weekDay','month' 컬럼 생성
- - 'season', 'holiday', 'workingday' 범주화
- - 위 컬럼 추출 후 datetime 컬럼 삭제
+# 일부 열 범주화(season, holiday, workingday, weather)
+#  - 'datetime'컬럼에서 'date', 'hour','weekDay','month' 컬럼 생성
+#  - 'season', 'holiday', 'workingday' 범주화
+#  - 위 컬럼 추출 후 datetime 컬럼 삭제
  
 # Creating New Columns From 'Datatime' Columns
 dailyDate.columns
@@ -59,7 +62,7 @@ categoryVariableList = ['hour','weekday','month','season','weather','holiday','w
 
 for var in categoryVariableList :
     dailyDate[var] = dailyDate[var].astype('category')
-dailyDate
+
 
 # 불필요한 컬럼 제거 (datetime 컬럼 제거)
 dailyDate = dailyDate.drop(['datetime'],axis = 1)
@@ -72,9 +75,18 @@ dataTypeDf = pd.DataFrame(dailyDate.dtypes.value_counts()).reset_index().rename(
 
 fig, ax = plt.subplots()
 fig.set_size_inches(12,5)
-sns.barplot(data = dataTypeDf, x = 'variableType', y='count',ax = ax)
-sns.barplot(data=dataTypeDf,x="variableType",y="count",ax=ax)
+
+sns.barplot(data=dataTypeDf,x='variableType',y='count',ax=ax)
 ax.set(xlabel = 'variableTypeariable Type', ylabel = 'Count', title = 'Variables DataType Count')
+
+# =============================================================================
+# Missing Values Analysis
+# =============================================================================
+msno.matrix(dailyDate, figsize = (12,5))
+
+# =============================================================================
+# Outliers Analysis
+# =============================================================================
 
 # =============================================================================
 # 부록
