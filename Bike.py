@@ -90,15 +90,47 @@ msno.matrix(dailyDate, figsize = (12,5))
 # =============================================================================
 fig, axes = plt.subplots(nrows = 2, ncols = 2)
 fig.set_size_inches(12,10)
+
 sns.boxplot(data=dailyDate, y='count', orient='v', ax=axes[0][0])  # orinet = 'v', vertical(세로방향)
 sns.boxplot(data=dailyDate, y='count',x='season', orient='v',ax=axes[0][1])
 sns.boxplot(data=dailyDate, y='count',x='hour', orient='v', ax=axes[1][0])
 sns.boxplot(data=dailyDate, y='count',x='workingday', orient='v', ax=axes[1][1])
 
 axes[0][0].set(ylabel='Count', title='Box Plots On Count')
-axes[0][1].set(xlabel='Season', title='Box Plot On Count Axross Hour Of The Day')
+axes[0][1].set(xlabel='Season', title='Box Plot On Count Across Hour Of The Day')
 axes[1][0].set(xlabel='hour Of The Day', ylabel='Count', title='Box polt On Count Across Hour Of The Day')
 axes[1][1].set(xlabel='Working Day', ylabel='Count', title='Box Plot On Xount Across Working Day')
+
+# =============================================================================
+# Remove Outliers In The Count Column
+# =============================================================================
+dailyDateWithoutOutliers = dailyDate[np.abs(dailyDate['count']-dailyDate['count'].mean())<=(3*dailyDate['count'].std())]
+
+print('Shape Of The Before Outliers :',dailyDate.shape)
+print('Shape Of The Before Oltliers :',dailyDateWithoutliers.shape)
+
+# =============================================================================
+# Correlation Analysis
+# =============================================================================
+corrMatt = dailyDate[['temp','atemp','casual','registered','humidity','windspeed','count']].corr()
+mask = np.array(corrMatt)
+mask[np.tril_indices_from(mask)] = False
+
+fig,ax = plt.subplots()
+fig.set_size_inches(10,5)
+sns.heatmap(corrMatt, mask = mask, vmax = .8, square = True, annot = True)
+
+fig, (ax1,ax2,ax3) = plt.subplots(ncols = 3)
+fig.set_size_inches(10,5)
+sns.regplot(x = 'temp', y = 'count', data = dailyDate, ax = ax1)
+sns.regplot(x = 'windspeed', y='count', data = dailyDate, ax = ax2, color = 'r')
+sns.regplot(x = 'humidity', y = 'count', data = dailyDate, ax = ax3, color = 'g')
+
+
+ - 종속변수가 변수에 의해 어떻게 영향을 받는지 이해하는 일반적 방법은 변수 사이 상관행렬을 섬유화하는 것이다.
+1) 온도와 습도 변수는 각각 양과 음의 상관관계가 있다. 이 둘의 상관 관계는 매우 두드러지진 않지만, 수치 변수는 'temp'와'humidity'에 거의 의존하지 않는다.
+2) 'windspeed'는 실제 유용한 수치 변수가 아니며 'count'와의 상관 관계 값에서 볼 수 있다.
+3) 
 
 # =============================================================================
 # 부록
@@ -114,4 +146,18 @@ import calendar
 sns.boxplot(kwargs)
 https://buillee.tistory.com/198
  
+np.triu_indices_from(arr)
+ - 삼각형에 대한 지수를 반환
+ https://numpy.org/doc/stable/reference/generated/numpy.triu_indices_from.html
  
+sns.heatmap(df, # 데이터
+            vmin = 100, # 최솟값
+            vman = 700, # 최댓값
+            cbar = True, # colorbar 유무
+            center = 400, # 중앙값 선정
+            linewidths = 0.5,   # cell 사이에 선 표
+            annot = True, # 각 cell의 값 표기 유무
+            fmt = 'd' # 그 값의 데이터 타입 설정
+            cmap = 'Blues' # 히트맵 색 설정
+            )
+https://dsbook.tistory.com/51
