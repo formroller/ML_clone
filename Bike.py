@@ -112,6 +112,16 @@ print('Shape Of The Before Oltliers :',dailyDateWithoutliers.shape)
 # =============================================================================
 # Correlation Analysis
 # =============================================================================
+
+ - 종속변수가 변수에 의해 어떻게 영향을 받는지 이해하는 일반적 방법은 변수 사이 상관행렬을 섬유화하는 것이다.
+1) 온도와 습도 변수는 각각 양과 음의 상관관계가 있다. 이 둘의 상관 관계는 매우 두드러지진 않지만, 수치 변수는 'temp'와'humidity'에 거의 의존하지 않는다.
+2) 'windspeed'는 실제 유용한 수치 변수가 아니며 'count'와의 상관 관계 값에서 볼 수 있다.
+3) 'temp'와 'atemp'가 서로 강한 상관 관계를 가지고 있어 'atemp'는 고려되지 않는다.
+    모델 구축시 변수가 데이터에서 다중 공선성을 나타내므로 변수 중 하나를 삭제해야 한다.
+4) 'casual'과 'registered' 또한 본질적으로 누수되는 변수이므로 모델 구축 중 삭제해야하므로 고려하지 않는다.
+
+'count' vs 'temp','humidity','windspeed' 고려
+
 corrMatt = dailyDate[['temp','atemp','casual','registered','humidity','windspeed','count']].corr()
 mask = np.array(corrMatt)
 mask[np.tril_indices_from(mask)] = False
@@ -127,10 +137,24 @@ sns.regplot(x = 'windspeed', y='count', data = dailyDate, ax = ax2, color = 'r')
 sns.regplot(x = 'humidity', y = 'count', data = dailyDate, ax = ax3, color = 'g')
 
 
- - 종속변수가 변수에 의해 어떻게 영향을 받는지 이해하는 일반적 방법은 변수 사이 상관행렬을 섬유화하는 것이다.
-1) 온도와 습도 변수는 각각 양과 음의 상관관계가 있다. 이 둘의 상관 관계는 매우 두드러지진 않지만, 수치 변수는 'temp'와'humidity'에 거의 의존하지 않는다.
-2) 'windspeed'는 실제 유용한 수치 변수가 아니며 'count'와의 상관 관계 값에서 볼 수 있다.
-3) 
+# =============================================================================
+# Visualizing Distribution Of Data
+# =============================================================================
+아래 그림에서 볼 수 있듯이 "count" 변수가 오른쪽으로 치우쳐 있다.
+기계학습기술의 대부분은 종속변수가 정상이어야 하므로 정규분포를 따르는 것이 바람직하다.
+한 가지 가능한 해결책은 특이치 데이터 점을 제거한 후 "count" 변수에 대한 로그 변환을 수행하는 것이다. 
+변환 후 데이터는 훨씬 좋아 보이지만 여전히 이상적으로 정규 분포를 따르지는 않는다.
+
+fig, axes = plt.subplots(ncols = 2, nrows = 2)
+fig.set_size_inches(12,10)
+sns.distplot(dailyDate['count'], ax = axes[0][0])
+stats.probplot(dailyDate['count'], dist='norm', fit = True, plot = axes[0][1])
+sns.distplot(np.log(dailyDateWithoutOutliers['count']), ax=axes[1][0])
+stats.probplot(np.log1p(dailyDateWithoutOutliers['count']), dist = 'norm', fit = True, plot = axes[1][1])
+
+# =============================================================================
+# Visualizing Count Vs (Month, Seadon, Hour, Weekday, Usertype)
+# =============================================================================
 
 # =============================================================================
 # 부록
