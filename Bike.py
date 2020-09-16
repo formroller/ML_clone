@@ -120,7 +120,7 @@ print('Shape Of The Before Oltliers :',dailyDateWithoutliers.shape)
     모델 구축시 변수가 데이터에서 다중 공선성을 나타내므로 변수 중 하나를 삭제해야 한다.
 4) 'casual'과 'registered' 또한 본질적으로 누수되는 변수이므로 모델 구축 중 삭제해야하므로 고려하지 않는다.
 
-'count' vs 'temp','humidity','windspeed' 고려
+# 'count' vs 'temp','humidity','windspeed' 고려
 
 corrMatt = dailyDate[['temp','atemp','casual','registered','humidity','windspeed','count']].corr()
 mask = np.array(corrMatt)
@@ -155,7 +155,32 @@ stats.probplot(np.log1p(dailyDateWithoutOutliers['count']), dist = 'norm', fit =
 # =============================================================================
 # Visualizing Count Vs (Month, Seadon, Hour, Weekday, Usertype)
 # =============================================================================
+1) 사람들이 여름동안 자전거를 빌리는 경향이 있는데, 이는 자전거를 타기 좋은 계절이기 때문이다.
+2) 평일 7-8AM, 5-6PM 사이 사람들이 자전거를 더 빌리는 사람들이 많아지는 경향이 있다.
+   앞에 언급했듯 이것은 일반적인 학생과, 근로자에 기인한다.
+3) 위의 패턴은 주말(토,일)에는 관찰되지 않는다. 주말에는 10AM - 4PM 사이 자전거를 빌리는 경향이 있다.
+4) 최대 사용자 수는 7-8 am, 5-6 pm 의 등록된 사용자가 원인이 된다.
 
+fig, (ax1, ax2, ax3, ax4) = plt.subplots(nrows = 4)
+fig.set_size_inches(12,20)
+
+sortOrder = ["January","February","March","April","May","June","July","August","September","October","November","December"]
+hueOrder = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
+
+monthAggregated = pd.DataFrame(dailyDate.groupby('month')['count'].mean()).reset_index()
+monthSorted = monthAggregated.sort_values(by = 'count', ascending = False)
+sns.barplot(data = monthSorted, x = 'month', y = 'count', ax = ax1, order=sortOrder)
+ax1.set(xlabel='Month', ylabel='Average Count', title='Average Count By Month')
+
+hourAggregated = pd.DataFrame(dailyDate.groupby(['hour','season'],sort=True)['count'].mean()).reset_index()
+sns.pointplot(x=hourAggregated['hour'], y=hourAggregated['count'], hue=hourAggregated['season'],data=hourAggregated, join=True, ax=ax2)
+ax2.set(xlabel='Hour Of The Day', ylabel='User Count', title='Average User Count By Hour Of The Day Across Season', label='big')
+
+hourAggregated = pd.DataFrame(dailyDate.groupby(['hour','weekday'],sort=True)['count'].mean()).reset_index()
+sns.pointplot(x=hourAggregated["hour"], y=hourAggregated["count"],hue=hourAggregated["weekday"],hue_order=hueOrder, data=hourAggregated, join=True,ax=ax3)
+ax3.set(xlabel='Hour Of The Day', ylabel='Users Count',title="Average Users Count By Hour Of The Day Across Weekdays",label='big')
+
+hourTransForm = 
 # =============================================================================
 # 부록
 # =============================================================================
