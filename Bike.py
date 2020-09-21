@@ -336,13 +336,44 @@ grid_lasso_m.fit(dataTrain, yLabelsLog ) # name 'check_X_y' is not defined
 # df["rmsle"] = df["mean_validation_score"].apply(lambda x:-x)
 # sn.pointplot(data=df,x="alpha",y="rmsle",ax=ax)
 
-# Ensenble Models - Random Forest
+# Ensemble Model - Random Forest
 from sklearn.ensemble import RandomForestRegressor
 rfmodel = RandomForestRegressor(n_estimators = 100, class_weight=None)
 yLabelsLog = np.log1p(yLabels)
 rfmodel_clf.fit(dataTrain,yLabelsLog)
 preds = rfModel.predict(X= dataTrain)
 print ("RMSLE Value For Random Forest: ",rmsle(np.exp(yLabelsLog),np.exp(preds),False))
+
+
+# Ensem Models = Gradient Boost
+# - 여러 개의 결정 트리를 묶어 강력한 모델을 만드는 또 다른 앙상블 기법
+# - 회귀와 분류에 모두 사용할 수 있음
+# - 랜덤포레스트와 달리 이진 트리의 오차를 보완하는 방식으로 순차적으로 트리를 만든다.
+# - 무작위성이 없고 강력한 사전 가지치기가 사용됨
+# - 1~5개의 깊지 않은 트리를 사용하기 때문에 메모리를 적게 사용하고 예측이 빠름
+# - learning_rate : 오차를 얼마나 강하게 보정할 것인지를 제어
+# - n_estimator의 값을 키우면 앙상블에 트리가 더 많이 추가되어 모델의 복잡도가 커지고 훈련 세트에서의 실수를 바로잡을 기회가 많아지지만, 너무 크면 모델이 복잡해지고 오버피팅(과대적합)이 될 수 있다.
+# - maxdepth(maxleaf_nodes) 복잡도를 너무 높이지 말고 트리의 깊이가 5보다 깊어지지 않게 한다.
+
+
+from sklearn.ensemble import GradientBoostingRegressor
+gbm = GradientBoostingRegressor(n_estimators=4000, alpha=0.01)
+yLabelsLog = np.log1p(yLabels)
+# gbm.fit(dataTrain, yLabelsLog) # 불가
+# preds = gbm.predict(X= dataTrain)
+# print ("RMSLE Value For Gradient Boost: ",rmsle(np.exp(yLabelsLog),np.exp(preds),False))
+
+# predsTest = gbm.predict(X= dataTest)
+# fig,(ax1,ax2)= plt.subplots(ncols=2)
+# fig.set_size_inches(12,5)
+# sn.distplot(yLabels,ax=ax1,bins=50)
+# sn.distplot(np.exp(predsTest),ax=ax2,bins=50)
+
+submission = pd.DataFrame({
+        "datetime": datetimecol,
+        "count": [max(0, x) for x in np.exp(predsTest)]
+    })
+submission.to_csv('bike_predictions_gbm_separate_without_fe.csv', index=False)
 
 # =============================================================================
 # 부록
