@@ -167,20 +167,183 @@ fig.set_size_inches(12,20)
 sortOrder = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 hueOrder = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
 
+# 1) count by month
 monthAggregated = pd.DataFrame(dailyDate.groupby('month')['count'].mean()).reset_index()
 monthSorted = monthAggregated.sort_values(by = 'count', ascending = False)
 sns.barplot(data = monthSorted, x = 'month', y = 'count', ax = ax1, order=sortOrder)
 ax1.set(xlabel='Month', ylabel='Average Count', title='Average Count By Month')
 
+# 2)count by Season
 hourAggregated = pd.DataFrame(dailyDate.groupby(['hour','season'],sort=True)['count'].mean()).reset_index()
 sns.pointplot(x=hourAggregated['hour'], y=hourAggregated['count'], hue=hourAggregated['season'],data=hourAggregated, join=True, ax=ax2)
 ax2.set(xlabel='Hour Of The Day', ylabel='User Count', title='Average User Count By Hour Of The Day Across Season', label='big')
 
+# 3)cout by weekday
 hourAggregated = pd.DataFrame(dailyDate.groupby(['hour','weekday'],sort=True)['count'].mean()).reset_index()
 sns.pointplot(x=hourAggregated["hour"], y=hourAggregated["count"],hue=hourAggregated["weekday"],hue_order=hueOrder, data=hourAggregated, join=True,ax=ax3)
 ax3.set(xlabel='Hour Of The Day', ylabel='Users Count',title="Average Users Count By Hour Of The Day Across Weekdays",label='big')
 
-hourTransForm = 
+# count by variable
+hourTransForm = pd.melt(dailyDate[['hour','casual','registered']], id_vars=['hour'], value_vars=['casual','registered'])
+hourAggregated = pd.DataFrame(hourTransForm.groupby(['hour','variable'], sort = True)['value'].mean()).reset_index()
+sns.pointplot(x=hourAggregated['hour'], y=hourAggregated['value'], hue=hourAggregated['variable'],hue_order=['casual','registered'],data=hourAggregated, join=True,)
+ax4.set(xlabel='Hour Of The Day', ylabel='User Count', title='Average User Count By Hour Of The Day Across User Type.')
+
+
+# =============================================================================
+# 모델 생성 및 예측
+# =============================================================================
+# 1. Random Forest 사용해 풍속의 0 채우기
+
+# 데이터 불러오기
+dataTrain = pd.read_csv('train.csv')
+dataTest = pd.read_csv('test.csv')
+# train/test data 분리
+data = dataTrain.append(dataTest)
+data.reset_index(inplace=True)
+data.drop('index', inplace=True,axis=1)
+# Feature Engineering
+data['date'] = data.datetime.apply(lambda x : x.split()[0])
+data['hour'] = data.datetime.apply(lambda x : x.split()[1].split(':')[0]).astype('int')
+data['year'] = data.datetime.apply(lambda x : x.split('-')[0])
+data['weekday'] = data.date.apply(lambda dateString : datetime.strptime(dateString,'%Y-%m-%d').weekday())
+data['month'] = data.date.apply(lambda dateString : datetime.strptime(dateString,'%Y-%m-%d').month)
+
+# 풍속이 0인 것을 예측하기 위한 랜덤 포레스트
+from sklearn.ensemble import RandomForestRegressor
+
+dataWind0 = data[data['windspeed']==0]
+dataWindNot0 = data[data['windspeed']!= 0]
+rfModel_wind = RandomForestRegressor()
+windColumns = ['season','weather','humidity','month','temp','year','atemp']
+rfModel_wind.fit(dataWindNot0[windColumns], dataWindNot0['windspeed'])
+
+wind0Value = rfModel_wind.predict(X = dataWind0[windColumns])
+dataWind0['windspeed'] = wind0Value
+data = dataWindNot0.append(dataWind0)
+data.reset_index(inplace = True)
+data.drop('index', inplace=True, axis = 1)
+
+# 범주형 타입에 적용
+categoricalFeatureNames = ["season","holiday","workingday","weather","weekday","month","year","hour"]
+numericalFeatureNames = ['temp','humidity','windspeed','atemp']
+dropFeatures = ['casual','count','datetime','date','registered']
+
+for var in categoricalFeatureNames:
+    data[var] = data[var].astype("category")
+
+
+# Spliting train and test data
+dataTrain = data[pd.notnull(data['count'])].sort_values(by=['datetime'])
+dataTest = data[~pd.notnull(data['count'])].sort_values(by=['datetime'])
+datetimecol = dataTest['datetime']
+yLabels = dataTrain['count']
+yLabelsRegistered = dataTrain['registered']
+yLabelsCasual = dataTrain['casual']
+
+# 불필요변수 제거
+dataTrain = dataTrain.drop(dropFeatures, axis=1)
+dataTest = dataTest.drop(dropFeatures, axis=1)
+
+# RMSLE Score
+def rmsle(y, y_, convertExp=True):
+    if convertExp:
+        y=np.exp(y),    # 예측값
+        y_ = np.exp(y_) # 실제값
+    log1 = np.nan_to_num(np.array([np.log(v + 1) for v in y])) # 넘파이 배열 형태로 변환, 값에 1 더하고 로그 씌운다.
+    log2 = np.nan_to_num(np.array([np.log(v + 1) for v in y_]))
+    calc = (log1 - log2) ** 2     # 위에서 계산한 예측값에서 실제값을 빼주고 제곱한다.
+    return np.sqrt(np.mean(calc)) # 평균 구한 후 루트를 씌운다.
+    
+# Linear Regression Model
+from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.model_selection import GridSearchCV
+from sklearn import metrics
+import warnings
+pd.options.mode.chained_assignment = None
+warnings.filterwarnings('ignore',category = DeprecationWarning)
+
+lModel = LinearRegression()
+# 모델 초기화
+yLabelsLog = np.log1p(yLabels) 
+# 모델 훈련
+lModel.fit(X = dataTrain, y = yLabelsLog)
+# 예측
+preds = lModel.predict(X=dataTrain)
+print('RMSLE Values For Linear Regression : ', rmsle(np.exp(yLabelsLog), np.exp(preds), False))
+
+
+# =============================================================================
+# # 정규화 모델 
+# =============================================================================
+# Ridge
+# - 회귀를 위한 선형모델
+# - 가중치(w)의 모든 원소가 0에 가깝게 만들어 모든 피처가 주는 영향을 최소화(기울기를 작게 만듦)
+# - Regularizaion(규제)은 오버피팅(과대적합)이 되지 않도록 모델을 강제로 제한
+# - max_iter : 반복 실행하는 최대 횟수
+
+ridge_m_ = Ridge()
+ridge_params_ = {'max_iter':[3000],'alpha':[0.1, 1, 2, 3, 4, 10, 30,100,200,300,400,800,900,1000]}
+rmsle_scorer = metrics.make_scorer(rmsle, greater_is_better=False)
+grid_ridge_m = GridSearchCV(ridge_m_,
+                            ridge_params_,
+                            scoring = rmsle_scorer,
+                            cv=5)
+
+yLabelsLog = np.log1p(yLabels)
+grid_ridge_m.fit(dataTrain, yLabelsLog)
+
+preds = grid_ridge_m.predict(X=dataTrain)
+print(grid_ridge_m.best_params_)
+print('RMSLE Values For Ridge Regression:', rmsle(np.exp(yLabelsLog), np.exp(preds), False))
+
+fig, ax = plt.subplots()
+fig.set_size_inches(12,5)
+
+
+grid_ridge_m.grid_scores
+df = pd.DataFrame(grid_ridge_m.cv_results_)   # 기존 코드는 grid_scores_였으나 cv_results로 대체되었다.
+df['alpha'] = df['param_alpha']   # 원코드에서 parmaeters -> prams_alpha
+df['rmsle'] = df['mean_test_score'].apply(lambda x : -x) # mean_validation_score -> mean_test_score
+sns.pointplot(data = df, x='alpha', y='rmsle',ax=ax)
+
+
+# Lasso
+# - 선형회귀의 Regularization(규제)을 적용하는 대안
+# - 계수를 0에 가깝게 만들려고 하며 이를 L1규제라 한다.
+#   (어떤 계수는 0이 되기도 하는데 이는 완전히 제외하는 피처가 생긴다는 의미다.)
+# - 피처 선택이 자동으로 이뤄진다고 볼 수 있다.
+# - alpha 값의 기본 값은 1.0이며, 과소 적합을 줄이기 위해서는 이 값을 줄여야 한다.
+# - 그리드 서치 아래 Lasso 모델 실행한 경우 베스트 알파 값은 0.0025
+# - max_iter(최대 반복 실행 횟수) : 3000
+
+lasso_m_ = Lasso()
+
+alpha  = 1/np.array([0.1, 1, 2, 3, 4, 10, 30,100,200,300,400,800,900,1000])
+lasso_params_ = { 'max_iter':[3000],'alpha':alpha}
+
+grid_lasso_m = GridSearchCV( lasso_m_,lasso_params_,scoring = rmsle_scorer,cv=5)
+yLabelsLog = np.log1p(yLabels)
+grid_lasso_m.fit(dataTrain, yLabelsLog ) # name 'check_X_y' is not defined
+# preds = grid_lasso_m.predict(X= dataTrain)
+# print (grid_lasso_m.best_params_)
+# print ("RMSLE Value For Lasso Regression: ",rmsle(np.exp(yLabelsLog),np.exp(preds),False))
+
+# fig,ax= plt.subplots()
+# fig.set_size_inches(12,5)
+# df = pd.DataFrame(grid_lasso_m.grid_scores_)
+# df["alpha"] = df["parameters"].apply(lambda x:x["alpha"])
+# df["rmsle"] = df["mean_validation_score"].apply(lambda x:-x)
+# sn.pointplot(data=df,x="alpha",y="rmsle",ax=ax)
+
+# Ensenble Models - Random Forest
+from sklearn.ensemble import RandomForestRegressor
+rfmodel = RandomForestRegressor(n_estimators = 100, class_weight=None)
+yLabelsLog = np.log1p(yLabels)
+rfmodel_clf.fit(dataTrain,yLabelsLog)
+preds = rfModel.predict(X= dataTrain)
+print ("RMSLE Value For Random Forest: ",rmsle(np.exp(yLabelsLog),np.exp(preds),False))
+
 # =============================================================================
 # 부록
 # =============================================================================
@@ -210,3 +373,33 @@ sns.heatmap(df, # 데이터
             cmap = 'Blues' # 히트맵 색 설정
             )
 https://dsbook.tistory.com/51
+
+
+# 풍속이 0인 것을 예측하기 위한 랜덤 포레스트
+from sklearn.ensemble import RandomForestRegressor
+
+dataWind0 = data[data['windspeed']==0]
+dataWindNot0 = data[data['windspeed']!= 0]
+rfModel_wind = RandomForestRegressor()
+windColumns = ['season','weather','humidity','month','temp','year','atemp']
+rfModel_wind.fit(dataWindNot0[windColumns], dataWindNot0['windspeed'])
+#  => dacon '생체 광학 데이터 분석 AI 경진대회'의 dst NaN값에 활용할 수 있어 보임
+
+# np.nan_to_num
+nan은 0으로, -inf, +inf느s 최대/최솟값으로 변경한다.
+(예) NaN을 0으로 바꾸기
+var = np.array([None, 7.0], dtype=np.float16)
+print(var)
+> [nan  7.]
+np.nan_to_num(var, copy=False)
+print(var)
+> [0. 7.]
+
+
+# np.mean(a), array.mean 차이
+a가 배열이 아닌 경우 변환이 시도된다. 즉, 대상이 되는 a는 array일 수도 아닐 수도 있다.
+array.mean() 대상이 array다.
+
+# 경고제어
+warnings.filterwarnings('ignore',category = DeprecationWarning)
+https://python.flowdas.com/library/warnings.html # 경고필터, 경고범주등 설명
