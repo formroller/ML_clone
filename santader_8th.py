@@ -320,4 +320,133 @@ train_df, features = apply_transforms(train_df)
 (시계열 경진대회에서는 lag-n 데이터가 유의미한 성능 개선을 보이는 경우가 종종 있다.**)
 
 lag 변수를 생성하기 위한 2개 도구 함수 설명
-도구 1) make_prev_df(train_df, step) 함수는 24개의 금융 변수에 대한 lag 데이터르 직접 생성하는 함수이다.
+도구 1) make_prev_df(train_df, step) 함수는 24개의 금융 변수에 대한 lag 데이터를 직접 생성하는 함수이다.
+    apply_transforms()함수에서 'fecha_dato' 날짜 데이터를 1-18사이의 정수로 변환한 'int_date'변수를 사용해
+    각 24개의 금융 변수의 값을 step개월 만큼 이동시켜, lag 변수를 생성한다.
+# (코드 2-29) Step 값 만큼의 lag 변수를 생성하는 make_prev_df 함수
+# main.py line 136
+def make_prev_df(train_df, step):
+    # 새로운 데이터 프레임에 ncodpers를 추가하고, int_date를 step만큼 이동시킨 값을 넣는다.
+    prev_df = pd.DataFrame()
+    prev_df['ncodpers'] = train_df['ncodpers']
+    prev_df['int_date'] = train_df['int_date'].map(lambda x : x+step).astype(np.int8)
+    
+    # "변수명_prev1" 형태의 lag 변수를 생성한다.
+    prod_features = ["%s_prev%s" % (prod, step) for prod in products]
+    for prod, prev in zip(products, prod_features):
+        prev_df[prev] = train_df[prod]
+
+    return prev_df, tuple(prod_feature)
+
+도구 2) join_with_prev(df, prev_df, how) 함수는 기존의 train_df에 lag 데이터를 조인하는 함수이다.
+# (코드 2-30) Lag 변수를 훈련 데이터에 통합하는 join_with_prev 함수
+# main.py line 182
+def join_with_prev(df, prev_df, how):
+    # pandas merge 함수를 통해 join
+    df = df.merge(prev_df, on = ['ncodpers','int_date'], how = how)
+    # 24개 금융 변수를 소수형으로 변환한다.
+    for f in set(prev_df.columns.values.tolist()) - set(['ncodpers','int_date']):
+        df[f] = df[f].astype(np.float16)
+    return df
+
+* 전처리 및 피처 엔지니어링이 완료된 train_df를 기준으로, 최대 lag-5 변수를 생성하고 train_df에 join한다.
+# (코드 2-31) lag-5 변수를 생성하는 코드
+# main.py line 163
+prev_dfs = []
+prod_features = None
+
+use_features = frozenset([1,2])
+# 1-5 까지의 step에 대해 make_prev_df()를 통해 lag-n 데이터를 생성한다.
+for step in range(1,6):
+    prev1_train-df, prod1_features = make_prev_df(train_df, step)
+    # 생성한 lag 데이터는 prev_dfs 리스트에 저장한다.
+    prev_dfs.append(prev1_train_df)
+    # features에는 lag-1,2만 추가한다.
+    if step in use_features:
+        features += prod1_features
+    # prod_features에는 lag-1의 변수명만 저장한다.
+    if step == 1:
+        prod_features = prod1_features
+#* 위 함수는 특이하게, lag-5 변수만 생성하면서도, features에는 lag-1,2 내용만 추가하고, prod_features에는 lag-1 변수명만 저장한다.
+
+lag-1 변수는 'inner join'으로 추가하고, 그 외는 'left join'으로 데이터에 추가한다.
+
+# (코드 2-32) lag-5 변수를 통합하는 함수
+# main.py line 193
+for i, prev_df in enumerate(prev_dfs):
+    how = 'inner' if i == 0 else 'left'
+    train_df = join_with_prev(train_df, prev_df, how = how)
+    
+한 단계 더 나아가, lag 변수에서 파생 변수를 생성한다.
+다음 코드에서는 lag 구간별 표준 편차, 최댓값, 최솟값을 구해 데이터에 추가한다.
+lag 변수의 기초 통계를 명시적으로 변수화해 학습 모델이 lag 변수에 숨겨진 패턴을 
+더욱 찾기 쉽게 하도록 돕는다.
+
+# (코드 2-33) lag-5 변수에서 파생 변수를 한 단계 더 생산하기
+# main.py line 198
+# 24개의 금융 변수에 대해 for loop를 돈다.
+for prod in products:
+    # [1-3], [1-5], [2-5]의 3개 구간에 대해 표준편차를 구한다.
+    for begin, end in [(1,3), (1,5), (2,5)]:
+        prods = ['%s_prev%s' % (prod, i) for i in range(begin, end+1)]
+        mp_df = train_df['prods'].values()
+        stdf = '%s_std_%s_%s' % (prod, begin, end)
+        
+        # np.nanstd로 편차를 구하고, features에 신규 파생 변수 이름을 추가한다.
+        train_df[stdf] = np.nanstd(mp_df, axis = 1)
+        features += (stdf,)
+        
+    # [2-3], [2-5]의 2개 구간에 대해 최대/최솟값을 구한다.
+    for begin, end in [(2,3),(2,5)]:
+        prods = ["%s_prev%s" % (prod,i) for i in range(begin, end+1)]
+        mp_df = train_df['prods'].values()
+        
+        minf = "%s_min_s%_s%" %(prod, begin, end)
+        train_df[minf] = np.nanmin(mp_df, axis= 1).astype(np.int8)
+        
+        maxf = "%s_max_%s_%s" %(prod, begin, end)
+        train-df[maxf] = np.nanmax(mp_df, axis=1).astype(np.int8)
+        
+        features += (minf, maxf,)
+        
+# (코드 2-34) 사용할 변수명의 중복값 여부를 확인하고, 훈련 데이터 추리기
+# main.py line 223
+# 고객 고유 식별 번호(ncodpers), 정수로 표현한 날짜(int_date), 실제 날짜(fecha_dato), 24개 금융변수(products)와
+# 학습하기 위해 전처리 / 피처 엔지니어링한 변수(features)가 주요한 변수이다.
+leave_columns = ['ncodpers','int_date','fecha_dato'] + list(products) + list(features)
+# 중복값이 없는지 확인한다.
+assert len(leave_columns) == len(set(leave_columns))
+# train_df에서 주요 변수만 출력한다.
+train_df = train_df[leave_columns]
+
+데이터 전처리와 피처 엔지니어링을 담당하는 make_dat()는 최종적으로 아래 3가지 변수를 만들어 낸다.
+train_df, features, prod_features
+
+- train_df 
+ 주요 변수를 포함하고 있는 훈련/테스트 데이터가 통합된 데이터 프레임이다.
+ 
+- features
+학습에 사용하기 위한 변수를 기록한 튜플이다.
+결측값 대체, Log tranform, label encoding, one-hoe-encoding, lag 데이터 등 변수명 포함
+
+- prod_featur
+lag-1 데이터의 변수명을 저장한 튜플이다
+ex) {금융변수명}_prev
+    
+# 피처 엔지니어링 완료된 데이터를 저장한다.
+train_df.to_picke('../8th.feature_engineer.all.pkl')
+pickle.dump(features, prod_features), open('./8th.feature_engineer.cv_meta.pkl','wb')
+
+
+# =============================================================================
+# 3. 머신러닝 모델 학습
+# =============================================================================
+train_predict()에서는 머신러닝 모델 학습을 위한 준비 과정을 거친 후, 
+LightGBM과 XGBoost 모델을 학습한다
+
+(8등 코드에서는 다음과 같이 trian_predict()를 총 2번 실행한다.)
+# main.py line 372
+train_predict(all_df, features, prod_features, "2016-05-28", cv = True)
+train_predict(all_df, features, prod_features, "2016-05-28", cv = False)
+
+-> train_predict()에서는 데이터를 훈련 / 검증 / 테스트의 3가지로 분리한다.
