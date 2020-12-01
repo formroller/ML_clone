@@ -450,3 +450,103 @@ train_predict(all_df, features, prod_features, "2016-05-28", cv = True)
 train_predict(all_df, features, prod_features, "2016-05-28", cv = False)
 
 -> train_predict()에서는 데이터를 훈련 / 검증 / 테스트의 3가지로 분리한다.
+
+* 첫 번째 train_predict()
+1) 가장 최신 날짜인 '2016-05-28' 을 테스트 데이터로 사용
+2) 그 외 '2015-01-28' ~ '2016-04-28' 훈련, 검증 데이터 (8:2)로 사용
+3) 검증 데이터 기반으로 LightGBM, XGBoost의 최적 파라미터 결정
+4) 모든 데이터를 머신러닝 모델에 다시 학습
+5) 테스트 데이터에 대한 예측값 생성
+
+=> 이때, 테스트 데이터에 대한 정답값을 기반으로, 경진대회 평가 척도인 MAP@7 값을 확인하여
+  캐글에 업로드하기 전 모델 성능을 자체적으로 검증한다.
+=> 훈련 데이터 안에서 훈련/검증/테스트로 분리하여 테스트 데이터의 평가 척도 계산하는 이유는
+  최대한 객관적인(objective, unbiased) 모델 성능을 계산하기 위해서이다.
+  
+  
+* 두 번째 train_predict()
+- 실제 훈련 데이터를 모두 사용해, 캐글에 업로드해야 할 '2016-06-28'날짜에 대한 예측 결과물을 만들어낸다.
+1) 머신러닝 학습 직전에 준비 과정을 수행
+2) 1)의 과정에서 제품 보유 여부를 의미하는 금융변수에서 신규 구매 정보 추출
+3) '제품 보유'와 '신규 구매'의 차이 인지 및 '신규 구매' 정보 추출 작업 수행
+4) '신규 구매'가 존재하는 데이터를 유효한 데이터로 인식.
+    
+# (코드 2-35) 교차 검증과 모델 학습을 수행하는 train_predict() 함수의 일부
+# main.py line 252
+def train_predict(all_df, features, prod_features, str_date, cv):
+    
+    # all_df, 통합 데이터
+    # features, 학습에 사용할 변수
+    # prod_features, 24개 금융 변수
+    # str_date, 예측 결과물을 산출하는 날짜.
+    #          2016-05-28일 경우, 훈련 데이터의 일부이며 정답을 알고 있기에 교차 검증을 의미
+    #          2016-06-28일 경우, 캐글에 업로드하기 위한 테스트 데이터 예측 결과물을 생성한다.
+    # cv, 교차 검증 실행 여부
+    
+    # str_date로 예측 결과물을 산출하는 날짜 지정
+    test_date = date_to_int(str_date)
+    
+    # 훈련 데이터는 test_date 이전의 모든 데이터를 사용한다.
+    train_df = all_df[all_df.int_date < test_date]
+    # 테스트 데이터를 통합 데이터에서 분리한다.
+    test_df = pd.DateFrame(all_df[all_df.int_date == test_date])
+    
+    # 신규 구매 고객만을 훈련 데이터로 추출한다.
+    X = []
+    Y = []
+    for i,prod in enumerate(products):
+        prev = prod + '_prev1'
+        # 신규 구매 고객을 prX에 저장한다.
+        prX = train_df[(train_df[prod] == 1) & (train_df[prev] == 0)]
+        # prY에는 신규 구매에 대한 label 값을 저장한다.
+        prY = np.zeros(prX.shape[0], dtype=np.int8) + i
+        X.append(prX)
+        Y.append(prY)
+        
+    XY = pd.concat(X)
+    y = np.hstack(Y)
+    # XY는 신규 구매 데이터만 포함한다.
+    XY['y'] = Y
+    
+    # 메모리에서 변수 삭제
+    del train_df; del all_df
+    
+    # 데이터별 가중치 계산하기 위해 새로운 변수(ncodpers + fecha_dato)를 생성한다.
+    XY['ncodepers_fecha_dato'] = XY['ncodpers'].astype(str) + XY['fecha_dato']
+    uniqs, counts = np.unique(XY['ncodepers_fecha_dato'], reture_counts=True)
+    # 자연 상수(e)를 통해, count가 높은 데이터에 낮은 가중치를 준다.
+    weights = np.exp(1/counts - 1)
+    
+    # 가중치를 XY 데이터에 추가한다.
+    wdf = pd.DateFrame()
+    wdf['ncodepers_fecha_dato'] = uniqs
+    wdf['counts'] = counts
+    wdf['weights'] = weights
+    XY = XY.merge(wdf, on='ncodepers_fecha_dato')
+    
+=> 준비 과정을 마친 데이터를 기반으로, LightGBM과 XGBoost 모델을 학습란다.
+  LightGBM과 XGBoost 각각 하나의 모델만을 학습하고, 각 모델의 결과물을 앙상블한 최종 결과물을 생성한다.
+  
+=> 다수의 모델 결과물을 생성하고 앙상블을 수행하는 것은 경진대회에서 일반적인 전략이다.
+  가장 일반적인 앙상블은 각 모델의 결과물의 산술 평균을 계산하는 방법이지만,
+  이번 코드에서는 기하 평균으로 앙상블을 계산한다.
+  
+# (코드 2-36) 교차 검증(8:2)을 위해 데이터를 분리하고 모델 학습/캐글 제출용 파일 생성 함수로 호출하기
+..
+ # 교차 검증을 위해 XY를 훈련:검증(8:2)으로 분리한다.
+    mask = np.random.rand(len(XY)) < 0.8
+    XY_train = XY[mask]
+    XY_validate = XY[~mask]
+    
+ # 테스트 데이터에서 가중치는 모두 1이다.
+    test_df['weight'] = np.ones(len(test_df), dtype=np.int8)
+    
+ # 테스트 데이터에서 '신규 구매' 정답값을 추출한다.
+    test_df['y'] = test_df['ncodpers']
+    y_prev = test_df['prod_features'].values()
+    for prod in products:
+        prev = prod + '_prev1'
+        padd = prod _ '_add'
+        # 신규 구매 여부를 구한다.
+        test_df[padd] = test_df[prod] - test_df[prev]
+    
