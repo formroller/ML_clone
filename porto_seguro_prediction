@@ -1,10 +1,10 @@
 import os
 os.getcwd()
-os.chdir('./porto')
+os.chdir('./.spyder-py3/kaggle/book/porto')
 # =============================================================================
 # chapter4. 포르토 세구로 안전 운전자 예측 경진대회 
 # =============================================================================
-# 4.1 경진대회 소개
+# 4.1 경진대회 소개sd
 
 문제 유형 : Binary Classification(이중 클래스 분류)
 평가 척도 : Normalized Gini Coefficient(정규화 지니 계수)
@@ -146,4 +146,275 @@ import seaborn as sns
 
 익명화된 변수를 데이터 타입 기준으로 이진, 범주형, 정수형, 소수형 변수 이렇게 4개 그룹으로 나눌 수 있다.
 trn.columns
-[for i in trn.columns]
+binary = ['ps_ind_06_bin', 'ps_ind_07_bin', 'ps_ind_08_bin',
+          'ps_ind_09', 'ps_ind_10_bin', 'ps_ind_11_bin',
+          'ps_ind_12_bin', 'ps_ind_13_bin', 'ps_ind_16_bin', 
+          'ps_ind_17_bin', 'ps_ind_18_bin', 'ps_calc_15_bin', 
+          'ps_calc_16_bin','ps_calc_17_bin','ps_calc_18_bin',
+          'ps_calc_19_bin','ps_calc_20_bin']
+
+category = ['ps_ind_02_cat', 'ps_ind_04_cat', 'ps_ind_05_cat',
+            'ps_car_01_cat', 'ps_car_02_cat','ps_car_03_cat', 'ps_car_04_cat', 'ps_car_05_cat', 'ps_car_06_cat',
+       'ps_car_07_cat', 'ps_car_08_cat', 'ps_car_09_cat', 'ps_car_10_cat',
+       'ps_car_11_cat']
+
+integer = ['ps_ind_03','ps_ind_03','ps_ind_14', 'ps_ind_15',
+           'ps_calc_01', 'ps_calc_02', 'ps_calc_03', 'ps_calc_04',
+       'ps_calc_05', 'ps_calc_06', 'ps_calc_07', 'ps_calc_08', 'ps_calc_09',
+       'ps_calc_10', 'ps_calc_11', 'ps_calc_12', 'ps_calc_13', 'ps_calc_14','ps_car_11']
+floats = ['ps_reg_01', 'ps_reg_02', 'ps_reg_03','ps_calc_01',
+          'ps_calc_02','ps_calc_03','ps_car_12','ps_car_13',
+          'ps_car_14','ps_car_15']
+
+# 단일 변수 히스토그램
+데이터 시각화를 위해 훈련 데이터와 테스트 데이터를 단일 데이터로 통합한다.
+
+# 4-5 변수별 히스토그램 시각화하기
+# 테스트 데이터의 'target' 변수를 결측값으로 설정한다.
+tst['target'] = np.nan
+
+# 훈련 데이터와 테스트 데이터를 통합한 새로운 데이터(df) 생성.
+df = pd.concat([trn,tst], axis = 0)
+# 히스토그램 그래프 시각화를 위한 함수
+def bar_plot(col, data, hue = None):
+    f, ax = plt.subplots(figsize=(10,5))
+    sns.countplot(x=col, hue=hue, data=data, alpha = 0.5)
+    plt.show()
+
+def dist_plot(col, data):
+    f, ax = plt.subplots(figsize=(10,5))
+    sns.distplot(data[col], dropna(), kde=False, bins=10)
+    plt.show()
+    
+# 이진 변수, 범주형 변수, 정수형 변수 시각화
+for col in binary + category + integer:
+    bar_plot(col, df)
+    
+# 소수형 변수를 시각화한다.
+for col in floats:
+    dist_plot(col_df)
+    
+1) 임의로 선별한 4개의 이진 변수 (ps_ind_16_bin, ps_ind_06_bin, ps_ind_11_bon, ps_calc_18_bin)에 대한 히스토그램을 확인한 결과,
+    이진 변수의 분포에서 확연한 차이를 볼 수 있다.
+    ps_ind_11_bin의 경우, 0의 빈도가 압도적으로 많은 편이고, 그 외 변수는 0과 1의 균형이 조금더 잡혀있는 변수.
+    
+2) 4개의 범주형(ps_car_01_cat, ps_car_05_cat,ps_car_11_cat,ps_ind_02_cat)에 대한 히스토그램을 확인해 본 결과,
+    범주형 변수의 고유값이 적게 2개부터 100개 이상까지 존재한다. ps_car_01_cat의 경우, 총 12개의 고유값 중 7.0과 11.0값의 빈도가 높게 나온다.
+    ps_ind_02_cat의 경우, 1.0값이 빈도가 가장 높으며 이후 감소.
+    
+3) 4개의 정수형 범주(ps_calc_06, ps_calc_07, ps_ind_01, pd_ind_03)에서 ps_calc_06과 ps_calc_07 변수를 정규 분포와 같은 분포를 보인다.
+    그 외 ps_ind_01, ps_ind_03으s 한쪽으로 쏠려있는 분포를 보인다.
+    
+4) 4개의 소수형 변수(ps_calc_01, ps_calc_02, ps_reg_01,ps_reg_02)에서 두 변수(ps_calc_01, ps_calc_02)는 균등 분포를 보이고 있다.
+    그 외 ps_reg_01, ps_reg_02 변수는 한쪽으로 쏠려 있는 분포를 보인다.
+    
+# 변수 간 상관관계
+다수의 익명화된 변수가 경진대회 데이터로 제공될 경우, 모든 데이터가 모델 학습에 유의미하지 않을 수 있다.
+특히, 상관관계가 너무 높은 두 변수를 하나의 모델에 넣는 것은 지양한다.
+
+# 4-6 변수 간 상관관계 HeatMap을 시각화하는 코드
+# 전체 변수에 대한 상관관계 heatmap 그래프 시각화
+corr = df.corr()
+
+cmap = sns.color_palette('Blues')
+f, ax = plt.subplots(figsize=(10,7))
+sns.heatmap(corr, cmap = cmap)
+
+# 일부 변수만 추출
+features = ['ps_ind_06_bin', 'ps_ind_07_bin','ps_ind_08_bin',
+            'ps_ind_09_bin', 'ps_ind_12_bin', 'ps_ind_13_bin',
+            'ps_ind_16_bin', 'ps_ind_17_bin', 'ps_ind_18_bin',
+            'ps_ind_02_cat','ps_ind_04_cat','ps_ind_05_cat',
+            'ps_car_01_cat', 'ps_car_02_cat', 'ps_car_03_cat', 
+            'ps_car_04_cat', 'ps_car_05_cat', 'ps_car_06_cat',
+            'ps_car_07_cat', 'ps_car_08_cat', 'ps_car_09_cat',
+            'ps_car_11_cat','ps_ind_01','ps_ind_03', 'ps_ind_14',
+            'ps_ind_15','ps_car_11','ps_reg_01','ps_reg_02',
+            'ps_reg_03','ps_car_12','ps_car_13','ps_car_14',
+            'ps_car_15']
+# 일부 변수에 대한 상관관계 heatmap 그래프 시각화
+corr_sub = df[features].corr()
+f, ax = plt.subplots(figsize = (10,7))
+sns.heatmap(corr_sub, cmap=cmap)
+
+=> 전체 변수에 대한 상관관계 HeatMap 시각화 결과, 대부분의 변수들이 상관관계가 매우 낮음을 알 수 있다.
+=> 일부 변수를 선별해 상관관계 HeatMap 그려본 결과, ps_ind와 ps_ind_12_bin 두 변수가 0.89의 높은 상관관계를 보유한 것을 확인.
+
+일반적으로 0.95 이상의 상관관계를 가질 경우, 변수 하나를 제거한다.
+이번 데이터에서는 최고 0.89 수준의 상관관계이기에, 별도로 제거하지 않고 진행한다.
+
+# 단일 변수 vs 타겟 변수
+앞선 단이 변수 히스토그램 시각화는 변수의 분포를 이해하는게 가장 큰 목적이었다.
+다음의 단일 변수의 고유값별로 타겟 변수의 비율을 시각화해보자.
+'단일 변수 vs 타겟 변수' 비율에 대한 시각화는 변수들의 예측 능력을 가늠하기 위한 시각화이다.
+변수 예측 능력의 통계적 유효성을 확인하기 위해, 변수의 고유값별로 95%의 신뢰구간을 함께 시각화한다.
+
+# 4-7 변수의 고유값별 타겟 변수에 대한 비율을 시각화하는 코드
+# 단일 vs 타겟 변수 시각화 위한 함수
+def bar_plot_ci(col, data):
+    f, ax = plt.subplots(figsize=(10,5))
+    sns.barplot(x=col, y='target', data=data)
+    plt.show()
+    
+# 이진, 범주형, 정수형 변수 시각화
+for col in binary + category + integer:
+    bar_plot_ci(col, df)
+
+전체 데이터 기준 타겟 변수의 비율은 3.6%이다. 이 점을 감안하며 함께 분석해보자.
+막대 그래프 중간에 그려진 검정색 직선은 95% 신뢰구간을 의미한다.
+
+ps_ind_16_bin, ps_ind_06_bin 두 변수는 이진 변수의 값에 따라 타겟 변수의 비율이 다르다.
+통계적 유효성을 충분히 지닌 두 변수는 모델링 관점에서 유용한 변수라 할 수 있다.
+ 반면, ps_ind_11_bin은 평균값 기준으로는 타겟 변수의 비율이 유의미하게 달라 보이지만, 통계적 유효성 없다.
+
+ps_car_01_cat 변수는 단순 히스토그램 분포와 달리 7.0과 11.0에서 타겟 비율이 상대적으로 낮은 편이다.
+ps_car_11_cat의 경우, 104개의 고유값이 0.02 ~ 0.08의 큰 범위의 타겟 비율을 보인다.(해당 변수도 어느 정도 예측력을 가진 변수로 보인다.)
+ps_ind_01, ps_ind_03 두 변수는 고유값별로 95% 신뢰 구간이 군집화된 것으로 보아, 어느정도 예측력 보유
+
+# 단일 변수별 타겟 비율이 95% 신뢰 구간 분석을 통해 확인한 유의미한 변수 목록
+['ps_ind_06_bin', 'ps_ind_07_bin', 'ps_ind_08_bin', 'ps_ind_09_bin', 'ps_ind_12_bin',
+ 'ps_ind_16_bin', 'ps_ind_17_bin', 'ps_ind_18_ind','ps_ind_04_cat', 'ps_ind_05_cat',
+ 'ps_car_01_cat', 'ps_car_02_cat', 'ps_car_03_cat', 'ps_car_04_cat', 'ps_car_06_cat',
+ 'ps_car_07_cat', 'ps_car_08_cat', 'ps_car_09_cat', 'ps_car_11_cat', 'ps_ind_01',
+ 'ps_ind_03', 'ps_ind_15', 'ps_car_11']
+
+
+# 훈련 데이터 vs 테스트 데이터 비교
+훈련 데이터와 테스트 데이터의 분포를 비교하는 시각화는 어느 경진대회에서든 매우 중요하다.
+머신러닝 모델은 주어진 훈련 데이터의 분포를 학습하기에, 두 데이터의 분포가 심각하게 다를 경우,
+훈련 데이터에서 학습한 내용은 무용지물이 되기 때문이다.
+
+훈련 데이터와 테스트 데이터의 변수 분포를 직접 시각화하여, 두 데이터의 분포가 얼마나 유사한지 확인해보자.
+
+# 4-8 훈련 데이터와 테스트 데이터의 분포를 비교하는 코드
+# 테스트 데이터를 구별하기 위한 'is_tst' 변수 생성
+df['is_tst'] = df['target'].isnull()
+
+# 이진 변수, 범주형 변수 그리고 정수형 변수 시각화
+for col in binary + category + integer:
+    bar_plot(col, df,'is_tst')
+    
+테스트 데이터는 훈련 데이터의 1.5배 분량이다. (892,816 / 595,212 == 1.499)
+훈련 데이터와 테스트 데이터의 단일 변수 히스토그램의 결과가 1.5배 비율을 유지한다면 
+훈련데이터와 테스트 데이터의 분포가 서로 유사하다고 가정할 수 있다.
+
+# 탐색적 데이터 분석 요약
+* 변수명을 통해 테이터를 총 4개 ['ind', 'calc', 'car', 'reg']의 그룹으로 변수를 군집
+* 변수명을 통해 이진, 범주형, 정수/소수형 변수를 구별할 수 있다.
+
+* 단일 변수에 대한 히스토그램 시각화를 통해 데이터의 분포 확인 가능했다.
+  상관관계 분석 결과, 정보력이 전혀 없는 상수 값 혹은 0.95 이상의 높은 상관관계를 갖는 변수 등은 존재하지 않는다.
+  
+* 변수 예측 능력을 가늠하기 위해 변수 고유값별 타겟 변수의 비율을 신뢰구간 95%와 함께 분석.
+-> 어떤 변수들이 타겟 변수 예측 능력이 있을지 간단하게 분석할 수 있었으며,
+   이는 파생 변수 생성 및 추후 모델 분석에 유의미한 정보이다.
+   
+* 훈련 데이터와 테스트 데이터는 매우 유사한 분포를 지니고 있다.
+
+=> 내부 교차 전략은 랜덤 K-fold 교차 검증 전략을 취하는게 안정적이다.
+
+# 4.7 Baseline 모델 
+실질적인 머신러닝 파이프라인 구축
+
+1. 데이터 전처리 -> 2. 피처 엔지니어링 -> 3. 학습 모델(LightGBM) 정의 -> 4. 모델 학습 및 교차 검증 평가 -> 5.테스트 데이터 예측 및 캐글 업로드
+
+# 1) 데이터 전처리
+* 변수들 모두 익명화
+* 값들은 숫자로 치환
+* 범주형 변수도 이미 숫자로 치환
+-> 별도의 데이터 전처리 필요 없음.
+
+# 4-9 훈련 데이터와 테스트 데이터 읽어와, id와 target 분리
+# gbm_model.py
+import pandas as pd
+import os 
+os.chdir('./.spyder-py3/kaggle/book/porto')
+
+# 훈련/테스트 데이터 읽어온다.
+train = pd.read_csv('train.csv')
+train_label = train['target']
+train_id = train['id']
+del train['target'], train['id']
+
+test = pd.read_csv('test.csv')
+test_id = test['id']
+del test['id']
+
+# 2) 피처 엔지니어링
+이번 Baseline 모델에서는 3가지 기초적인 피처 엔지니어링 수행
+
+ 1. 결측값의 개수를 나타내는 missing 변수
+ 2. 이진 변수들의 총 합
+ 3. Target Encoding 파생 변수
+ 
+# 4-10 파생 변수를 생성하는 코드 : 파생 변수 03은 교차 검증 과정에서 수행
+# 파생 변수 01 : 결측값을 의미하는 '-1'의 갯수를 센다
+train['missing'] = (train==-1).sum(axis=1).astype(float)
+test['missnig'] = (test==-1).sum(axis=1).astype(float)
+
+# 파생 변수 02: 이진 변수의 합
+bin_features = [c for c in train.columns if 'bin' in c]
+train['bin_sum'] = train[bin_features].sum(axis=1)
+test['bin_sum'] = test[bin_features].sum(axis=1)
+
+# 파생 변수 03: 단일변수 타겟 비율 분석으로 선정한 변수를 기반으로 Target Encoding을 수행한다.
+#               (Target Encoding은 교차검증 과정에서 진행한다.)
+
+features = ['ps_ind_06_bin', 'ps_ind_07_bin', 'ps_ind_08_bin', 'ps_ind_09_bin', 'ps_ind_12_bin',
+ 'ps_ind_16_bin', 'ps_ind_17_bin', 'ps_ind_18_ind','ps_ind_04_cat', 'ps_ind_05_cat',
+ 'ps_car_01_cat', 'ps_car_02_cat', 'ps_car_03_cat', 'ps_car_04_cat', 'ps_car_06_cat',
+ 'ps_car_07_cat', 'ps_car_08_cat', 'ps_car_09_cat', 'ps_car_11_cat', 'ps_ind_01',
+ 'ps_ind_03', 'ps_ind_15', 'ps_car_11']
+
+[파생 변수]
+1)첫번째 파생 변수는 운전자 데이터별 결측값의 갯수를 더한 값이다.
+- '결측값위 갯수'라는 파생 변수는 쉽게 만들 수 잇으며, 과거 대회에서 주요한 변수로 작용한 경우를 종종 확인할 수 있다.
+- 결측값의 개수가 데이터 내에 새로운 군집 정보를 제공할 수 있지 않을까?
+
+2) 이진 변수 값의 합
+- 변수 간의 상호 작용으로 얻을 수 있는 고차원 정보를 출력한다.
+- 이진 변수는 값이 0 or 1 이므로 각 변수가 파생 변수에 미치는 영향력이 균등하다.
+- 실수값 혹은 범주형 변수 간의 상호 작용 변수를 생성할 경우, 변수별 영향력을 조절하는 작업이 필요하다.
+
+3) 선별한 일부 변수를 대상으로 Target Encoding을 수행한다.
+- Target Encoding은 단일 변수의 고유값별 타겟 변수의 평균값을 파생 변수로 활용하는 피처 엔지니어링 기법이다.
+예를 들어, 운전자 A의 'ps_ind_01' 변수 값이 0일 경우,
+'ps_ind_01'변수 값이 0인 모든 운전자들의 평균 타겟 값을 'ps_ind_01_target_enc' 파생 변수로 사용하는 것이다.
+(주로 범주형에서 좋은 성능을 보인다.)
+- 타겟 변수의 값을 직접적으로 사용하는 변수이기에, 구현을 잘못할 경우 데이터 유출로 이어져 모델 파이프라인이 망가질 수 있다.
+- 데이터 유출 방지를 위해, 5-Fold 내부 교차 검증 과정에서 
+학습에 사용되는 4/5의 훈련데이터로 변수 고유값별 평균 타겟값 계산 후,
+1/5의 검증 데이터에 해당 값을 매핑하는 방식을 취한다.
+
+# 3) LightGBM 모델 정의
+학습에 사용할 LightGBM 모델의 설정값은 다음과 같다
+
+num_leaves, max_bin, min_child_samples -> 모델의 복잡도 조절
+feature_fraction, subsample, max_drop -> 과적합 방지
+
+# 4-11 LightGBM 모델의 설정값
+# LightGBM 모델의 설정값이다.
+num_boost_round = 10000
+params = {
+    'objective':'binary',
+    'boosting_type':'gbdt',
+    'learning_rate':0.1,
+    'num_leaves':15,
+    'max_bin':256,
+    'feature_fraction':0.6,
+    'verbosity':0,
+    'drop_rate':0.1,
+    'is_unbalance':False,
+    'max_drop':50,
+    'min_child_samples':10,
+    'min_child_weight':150,
+    'min_split_gain':0,
+    'subsample':0.9,
+    'seed':2018
+    }
+
+# http://machinelearningkorea.com/2019/09/29/lightgbm-%ED%8C%8C%EB%9D%BC%EB%AF%B8%ED%84%B0/ (lightgbm paramter 참고)
+# https://github.com/microsoft/LightGBM/blob/master/docs/Parameters.rst (LightGBM parameter 참고)
+
+
+
