@@ -27,10 +27,10 @@ predictions = [0.9,0.3,0.8,0.75,0.65,0.6,0.78,0.7,0.05,0.4,0.4,0.05,0.5,0.1,0.1]
 # Actual (정답)
 actual = [1,1,1,1,1,1,0,0,0,0,0,0,0,0,0]
 
-import numpy as np
 
 파이썬으로 구현된 지니 계수 함수를 사용한다.
 # 4-1 지니 계수를 계산하는 파이썬 함수
+import numpy as np
 
 def gini(actual, pred):
     assert (len(actual) == len(pred))
@@ -157,7 +157,7 @@ category = ['ps_ind_02_cat', 'ps_ind_04_cat', 'ps_ind_05_cat',
             'ps_car_01_cat', 'ps_car_02_cat','ps_car_03_cat', 'ps_car_04_cat', 'ps_car_05_cat', 'ps_car_06_cat',
        'ps_car_07_cat', 'ps_car_08_cat', 'ps_car_09_cat', 'ps_car_10_cat',
        'ps_car_11_cat']
-
+train.columns
 integer = ['ps_ind_03','ps_ind_03','ps_ind_14', 'ps_ind_15',
            'ps_calc_01', 'ps_calc_02', 'ps_calc_03', 'ps_calc_04',
        'ps_calc_05', 'ps_calc_06', 'ps_calc_07', 'ps_calc_08', 'ps_calc_09',
@@ -273,7 +273,7 @@ ps_ind_01, ps_ind_03 두 변수는 고유값별로 95% 신뢰 구간이 군집�
 
 # 단일 변수별 타겟 비율이 95% 신뢰 구간 분석을 통해 확인한 유의미한 변수 목록
 ['ps_ind_06_bin', 'ps_ind_07_bin', 'ps_ind_08_bin', 'ps_ind_09_bin', 'ps_ind_12_bin',
- 'ps_ind_16_bin', 'ps_ind_17_bin', 'ps_ind_18_ind','ps_ind_04_cat', 'ps_ind_05_cat',
+ 'ps_ind_16_bin', 'ps_ind_17_bin', 'ps_ind_18_bin','ps_ind_04_cat', 'ps_ind_05_cat',
  'ps_car_01_cat', 'ps_car_02_cat', 'ps_car_03_cat', 'ps_car_04_cat', 'ps_car_06_cat',
  'ps_car_07_cat', 'ps_car_08_cat', 'ps_car_09_cat', 'ps_car_11_cat', 'ps_ind_01',
  'ps_ind_03', 'ps_ind_15', 'ps_car_11']
@@ -318,7 +318,9 @@ for col in binary + category + integer:
 
 1. 데이터 전처리 -> 2. 피처 엔지니어링 -> 3. 학습 모델(LightGBM) 정의 -> 4. 모델 학습 및 교차 검증 평가 -> 5.테스트 데이터 예측 및 캐글 업로드
 
-# 1) 데이터 전처리
+# =============================================================================
+# 1. 데이터 전처리
+# =============================================================================
 * 변수들 모두 익명화
 * 값들은 숫자로 치환
 * 범주형 변수도 이미 숫자로 치환
@@ -326,7 +328,9 @@ for col in binary + category + integer:
 
 # 4-9 훈련 데이터와 테스트 데이터 읽어와, id와 target 분리
 # gbm_model.py
+
 import pandas as pd
+import numpy as np
 import os 
 os.chdir('./.spyder-py3/kaggle/book/porto')
 
@@ -340,7 +344,9 @@ test = pd.read_csv('test.csv')
 test_id = test['id']
 del test['id']
 
-# 2) 피처 엔지니어링
+# =============================================================================
+# 2. 피처 엔지니어링
+# =============================================================================
 이번 Baseline 모델에서는 3가지 기초적인 피처 엔지니어링 수행
 
  1. 결측값의 개수를 나타내는 missing 변수
@@ -361,7 +367,7 @@ test['bin_sum'] = test[bin_features].sum(axis=1)
 #               (Target Encoding은 교차검증 과정에서 진행한다.)
 
 features = ['ps_ind_06_bin', 'ps_ind_07_bin', 'ps_ind_08_bin', 'ps_ind_09_bin', 'ps_ind_12_bin',
- 'ps_ind_16_bin', 'ps_ind_17_bin', 'ps_ind_18_ind','ps_ind_04_cat', 'ps_ind_05_cat',
+ 'ps_ind_16_bin', 'ps_ind_17_bin', 'ps_ind_18_bin','ps_ind_04_cat', 'ps_ind_05_cat',
  'ps_car_01_cat', 'ps_car_02_cat', 'ps_car_03_cat', 'ps_car_04_cat', 'ps_car_06_cat',
  'ps_car_07_cat', 'ps_car_08_cat', 'ps_car_09_cat', 'ps_car_11_cat', 'ps_ind_01',
  'ps_ind_03', 'ps_ind_15', 'ps_car_11']
@@ -386,7 +392,9 @@ features = ['ps_ind_06_bin', 'ps_ind_07_bin', 'ps_ind_08_bin', 'ps_ind_09_bin', 
 학습에 사용되는 4/5의 훈련데이터로 변수 고유값별 평균 타겟값 계산 후,
 1/5의 검증 데이터에 해당 값을 매핑하는 방식을 취한다.
 
-# 3) LightGBM 모델 정의
+# =============================================================================
+# 3. LightGBM 모델 정의
+# =============================================================================
 학습에 사용할 LightGBM 모델의 설정값은 다음과 같다
 
 num_leaves, max_bin, min_child_samples -> 모델의 복잡도 조절
@@ -394,6 +402,9 @@ feature_fraction, subsample, max_drop -> 과적합 방지
 
 # 4-11 LightGBM 모델의 설정값
 # LightGBM 모델의 설정값이다.
+
+import lightgbm as lgbm
+
 num_boost_round = 10000
 params = {
     'objective':'binary',
@@ -416,5 +427,83 @@ params = {
 # http://machinelearningkorea.com/2019/09/29/lightgbm-%ED%8C%8C%EB%9D%BC%EB%AF%B8%ED%84%B0/ (lightgbm paramter 참고)
 # https://github.com/microsoft/LightGBM/blob/master/docs/Parameters.rst (LightGBM parameter 참고)
 
+# =============================================================================
+# 4.모델 학습 및 교차 검증 평가
+# =============================================================================
+교차 검증에는 5-Fold StratifiedKFold 기법을 사용한다.
+시계열 데이터가 아니기 때문에 (익명화되어 장담할 수 없지만, 데이터 탐색적 분석 과정에서 시계열 특성 지닌 변수 확인 못 함.)
+제공된 데이터를 랜덤하게 분리해 교차 검증에 활용한다.
 
+# 4-12 교차 검증 과정을 통해 검증 데이터에 대한 평가 점수와 테스트 데이터에 대한 최종 예측값을 계산해 별도의 파일에 저장.
+# Stratified 5-Fold 내부 교차 검증 준비
 
+from sklearn.model_selection import StratifiedKFold
+
+NFOLDS = 5
+kfold = StratifiedKFold(n_splits=NFOLDS, shuffle = True, random_state = 218)
+kf = kfold.split(train,train_label)
+
+cv_train = np.zeros(len(train_label))
+cv_test = np.zeros(len(test_id))
+best_trees = []
+fold_scores = []
+
+for i, (train_fold, validate) in enumerate(kf):
+    # 훈련/검증 데이터 분리한다.
+    X_train, X_validate, label_train, label_validate= train.iloc[train_fold,:], train.iloc[validate,:], train_label[train_fold], train_label[validate]
+    
+    # targe encoding 피처 엔지니어링 수행
+    for feature in features:
+        # 훈련 데이터에서 feature 고유값별 타겟 변수의 평균을 구한다.
+        map_dic = pd.DataFrame([X_train[feature], label_train]).T.groupby(feature).agg('mean')
+        map_dic = map_dic.to_dict()['target']
+        # 훈련/검증/테스트 데이터에 평균값을 매핑한다.
+        X_train[feature + '_target_enc'] = X_train[feature].apply(lambda x:map_dic.get(x,0))
+        X_validate[feature + '_taeget_enc'] = X_validate[feature].apply(lambda x:map_dic.get(x,0))
+        test[feature + '_target_enc'] = test[feature].apply(lambda x:map_dic.get(x,0))
+        
+    
+    dtrain = lgbm.Dataset(X_train, label_train)
+    dvalid = lgbm.Dataset(X_validate, label_validate, reference = dtrain)
+    # 훈련 데이터를 학습하고, evaleeror()함수를 통해 검증 데이터에 대한 정규화 Gini 계수 점수를 기준으로 최적의 트리 개수를 찾는다.
+    bst = lgbm.train(params, dtrain, num_boost_round, valid_sets=dvalid, feval=evalerror, verbose_eval=100, early_stopping_rounds=100)
+    best_trees.append(bst.iteration)
+    # 테스터 데이터에 대한 예측값을 cv_pred에 더한다.
+    cv_pred += bst.predict(test, num_iteration=bst.best_iteration)
+    cv_train[validate] += bsst.predict(X_validate)
+    
+    # 검증 데이터에 대한 평가 점수를 출력한다.
+    score=Gini(label_validate, cv_train[validate])
+    print(score)
+    fold_scores.append(score)
+    
+    cv_pred /= NFOLDS
+
+# 시드값별 교차 검증 점수 출력
+print('cv score:')
+print(gini(train_label, cv_train))
+print(fold_scores)
+print(best_trees, np.mean(best_trees))
+
+# 테스트에 대한 결과물을 저장한다.
+pd.DataFrame({'id':test_id, 'target':cv_pred}).to_csv('../lgbm_baseline.csv',index=False)
+
+앞선 코드를 실행하면, 훈련 데이터의 4/5에 해당하는 X_train에 lightGBM 모델을 학습하고,
+검증 데이터와 테스트 데이터에 대한 예측값을 저장한다.
+5-Fold 교차 검증이므로, 이 과정을 총 5번 수행한다.
+Fold별 지니 평가 점수를 추력해 학습 과정 관찰 가능.
+
+# =============================================================================
+# 5. 요약
+# =============================================================================
+1. 포르토 세구로 안전 운전자 예측 경진대회의 Baseline 모델을 비교적 쉽게 구축할 수 있다.
+  주최측에서 데이터 익명화와 전처리 과정을 꼼꼼하게 진행해, 별도로 제이터 정제 및 전처리 할 필요 없었다.
+  
+2. Baseline 모델에서는 3가지 파생 변수를 생성한다. 
+ - 결측값의 개수를 나타내는 'missing'변수
+ - 이진 변수들의 합을 나타내는 상호작용 변수 그리고 데이터 탐색적 분석 과정에서 얻은 예측력이 높은
+  일부 변수들을 대상으로 Target Encoding 파생 변수를 생성한다.
+- 내부적으로 피처 엔지니어링과 모델 파라미터에 대한 평가를 수행하기 위해 
+  5-Fold Stratified 교차 검증 프로세스를 구축한다.
+=> 타겟 변수값을 직접적으로 사용하는 Target Encodin은 데이터 유출을 방지하기 위해 교차 검증 과정에서 파생 변수를 생성한다.
+=> 총 5번의 Folddㅔ서 학습한 모델의 예측값을 평균해 테스트 데이터에 대한 최종 예측값을 산출한다.
