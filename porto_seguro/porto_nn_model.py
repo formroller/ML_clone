@@ -222,3 +222,23 @@ for t in ['ps_car_13','ps_ind_03','ps_reg_03','ps_ind_15', 'ps_reg_01','ps_ind_0
 X = sparse.hstack(tarin_list).tocsr()
 X_test = sparse.hstack(test_list).tocsr()
 all_data = np.vstack([X.toarray(),X_test.toarray()])
+
+# 인공 신경망 학습을 위해 모든 변수값ㅇ르 -1 ~ 1로 Scaling한다.
+scaler = StandardScaler()
+scaler.fit(all_data)
+X = scaler.transform(X.toarray())
+X_test = scaler.transform(X_test.toarray())
+
+=> 전체 변수에 대한 파생 변수를 생성하지 않고, 일부 변수에 대해서만 피벗 기반 기초통계 파생 변수 및 상호 작용 변수 등을 생성한다.
+
+인공 신경망 모델을 학습해본다. 이번 경진대회에서 사용하는 인공 신경망 모델은 2계측 Fully Connencted Layer 모델이다.
+이미지 분류 혹은 음성 인식 경진대회에서는 50계층을 넘는 거대한 인공 신경망이 모델이 흔히 사용되지만,
+해당 대회 같은 테이블형 데이터에는 2~3계층 모델의 표현력(capacuty)으로도 충분히 데이터 내 패턴을 학습할 수 있다.
+
+# 4-17 인공 신경망 모델 정의
+# 2계층 인공 신경망 모델을 정의한다.
+def nn_model():
+    inputs = []
+    flatten_layers = []
+    
+    # 범주형 변수에 대한 Embedding 계층을 정의한다. 모든 범주형 변수는 해당 변수의 최댓값(num_c) 크기의 벡터 임베딩을 학습한다.
