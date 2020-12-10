@@ -196,4 +196,29 @@ for c in cat_fea:
     
 # 범주형 변수의 빈도값으로 새로운 파생 변수 생성
 cat_count_features = []
-for c in cat_fea
+for c in cat_fea + ['new_ind','new_reg','new_car']:
+    d = pd.concat([train[c], test[c]]).value_counts().to_dict()
+    train['%s_count'%c] = train[c].apply(lambda x:d.get(x,0))
+    test['%s_count'%c] = test[c].apply(lambda x:d.get(x,0))
+    cat_count_features.append('$s_count'%c)
+    
+# XGBoost 기반 변수를 읽어온다.
+tarin_fea0, test_fea0 = pickle.load(open('./fea0.pk','rb'))
+
+# 수치형 변수의 결측값/이상값을 0으로 대체사고, 범주형 변수와 XGBoost 기반 변수를 통합한다.
+train_list = [train_num.replace([np.inf, -np.inf, np.nan],0), train[cat_count_features], train_fea0]
+test_list = [test_nem.replace([np.inf, -np.inf, np.nan],0), test[cat_count_features], test_fea0]
+
+# 피벗 기반 기초 통계 파생 변수를 생성.
+for t in ['ps_car_13','ps_ind_03','ps_reg_03','ps_ind_15', 'ps_reg_01','ps_ind_01']:
+    for g in ['ps_car_13','ps_ind_03','ps_reg_03','ps_ind_15', 'ps_reg_01','ps_ind_01','ps_ind_05_cat']:
+        if t != g:
+            # group_column 변수를 기반으로 target_column 값을 피벗한 후, 기초 통계 값을 파생 변수로 추가한다.
+            s_train, s_test = proj_num_on_cat(train, test, target_column = t, group_column = g)
+            train_list.append(s_train)
+            test_list.append(s_test)
+            
+# 데이터 전체를 메모리 효율성을 위해 희소 행렬(sparse.tocsr())로 변환한다.
+X = sparse.hstack(tarin_list).tocsr()
+X_test = sparse.hstack(test_list).tocsr()
+all_data = np.vstack([X.toarray(),X_test.toarray()])
