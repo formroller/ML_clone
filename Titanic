@@ -1,0 +1,179 @@
+import pandas as pd
+import numpy as np
+
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split
+from sklearn.impute import KNNImputer
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import RepeatedStratifiedKFold, cross_val_score
+
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis, QuadraticDiscriminantAnalysis
+from sklearn.linear_model import LogisticRegression
+
+from sklearn.metrics import roc_auc_score
+from sklearn.preprocessing import StandardScaler
+
+from sklearn.model_selection import RandomizedSearchCV,GridSearchCV,StratifiedKFold
+
+train = pd.read_csv('train.csv')
+test = pd.read_csv('test.csv')
+
+
+target=train['Survived']
+submission = pd.DataFrame(test['PassengerId'])
+
+sns.countplot(train['Survived'],hue = train['Sex'])*100
+print('percentage of male survived:', train.groupby('Sex')['Survived'].value_counts(normalize=True)*100)
+
+sns.barplot(x=train['Pclass'], y = train['Survived'], hue = train['Sex'])
+print('percentage of pclass survived:',train.groupby(['Pclass'])['Survived'].value_counts(normalize = True)*100)
+
+# pclass vs gender
+sns.barplot(x=train['Pclass'],y=train['Survived'], hue = train['Sex'])
+train.groupby(['Pclass','Sex'])['Survived'].value_counts(normalize=True)*100
+=> 1등석 96% 여성 생존
+=> 2등석 94% 여성 생존
+
+# 컬럼별 상관관계
+sns.heatmap(train.drop('PassengerId', axis = 1).corr(), annot = True)
+=> 카이스퀘어 제곱을 통해 범주형과 타겟의 관게 도출할 것.
+
+# 요금 분포
+sns.displot(train['Fare'], bins = 13) # gaussian distribution
+sns.boxplot(y=train['Fare'], x= train['Survived'])
+
+# 1. Null values
+print(train.isnull().sum(), '\n\n\n', test.isnull().sum())
+
+# Age 대체
+a=train.groupby(train['Pclass'])['Age'].median()
+train['Age'] = train['Age'].fillna(train['Pclass'].map(a))
+test['Age'] = test['Age'].fillna(test['Pclass'].map(a))
+#.fillna(train['Pclass'].map(a)), Pclass별 결측치 대체하기 위함
+
+train['Embarked'].fillna('S',inplace = True)
+test['Fare'].fillna(test['Fare'].median(), inplace=True)
+
+train['Cabin'].fillna('X', inplace=True)
+test['Cabin'].fillna('X', inplace=True)
+
+# Data Manupulation
+
+# Cabin 데이터 추출
+x=[]
+for i in range(len(train)):
+    a=train['Cabin'][i][0]
+    x.append(a)
+train['Cabin']=x
+
+x=[]
+for i in range(len(test)):
+    x.append(test['Cabin'][i][0])
+test['Cabin']=x
+
+train['Cabin'] = train['Cabin'].map({'A':3,'B':3,'C':3,'D':2,'E':2,'F':2,'T':3,'X':0,'G':1})
+test['Cabin'] = test['Cabin'].map({'A':3,'B':3,'C':3,'D':2,'E':2,'F':2,'T':3,'X':0,'G':1})
+
+# title 추출
+a=[]
+for i in range(len(train)):
+    a.append(train['Name'][i].split()[1])
+train['Title']=a
+
+a=[]
+for i in range(len(test)):
+    a.append(test['Name'][i].split()[1])
+test['Title']=a
+
+# Passenger -> 가족규모 추출
+train['Passenger'] = train['SibSp'] + train['Parch']+1
+test['Passenger'] = test['SibSp'] + test['Parch']+1
+
+def family(size):
+    a=' '
+    if(size<=1):
+        a='lonely'
+    elif(size<=3):
+        a='nuclear'
+    elif(size<=6):
+        a='middle'
+    else:
+        a='large'
+    return a
+
+train['Passenger'] = train['Passenger'].map(family)
+test['Passenger'] = test['Passenger'].map(family)
+
+# Ticket 추출
+a=[]
+for i in range(len(train['Ticket'])):
+    if not(train['Ticket'][i][0].isdigit()):
+        a.append(1)
+    else:
+        a.append(0)
+train['Ticket']=a
+
+a=[]
+for i in range(len(test['Ticket'])):
+    if not(test['Ticket'][i][0].isdigit()):
+        a.append(1)
+    else:
+        a.append(0)
+test['Ticket']=a
+
+# drop columns
+train.drop(['Name', 'PassengerId','Cabin'], axis = 1, inplace =True)
+test.drop(['Name', 'PassengerId','Cabin'], axis = 1, inplace =True)
+
+# encoding category value
+encode = LabelEncoder()
+encode.fit(train['Sex'])
+train['Sex'] = encode.transform(train['Sex'])
+test['Sex'] = encode.transform(test['Sex'])
+
+encode.fit(train['Embarked'])
+train['Embarked'] = encode.transform(train['Embarked'])
+test['Embarked'] = encode.transform(test['Embarked'])
+
+
+encode.fit(train['Passenger'])
+train['Passenger'] = encode.transform(train['Passenger'])
+test['Passenger'] = encode.transform(test['Passenger'])
+
+train['Title']=train['Title'].replace(['Rev.', 'y', 'Planke,',
+       'Impe,', 'Major.', 'Gordon,', 'Mlle.', 'Col.', 'Cruyssen,', 'Mme.',
+       'Carlo,', 'Messemaeker,', 'Mulder,', 'Melkebeke,', 'der', 'Jonkheer.',
+       'the', 'Pelsmaeker,', 'Velde,', 'Shawah,', 'Walle,', 'Capt.', 'Steen,',
+       'Don.', 'Billiard'],'Rare')
+
+test['Title']=test['Title'].replace(['Rev.', 'y', 'Planke,',
+       'Impe,', 'Major.', 'Gordon,', 'Mlle.', 'Col.', 'Cruyssen,', 'Mme.',
+       'Carlo,', 'Messemaeker,', 'Mulder,', 'Melkebeke,', 'der', 'Jonkheer.',
+       'the', 'Pelsmaeker,', 'Velde,', 'Shawah,', 'Walle,', 'Capt.', 'Steen,',
+       'Don.', 'Billiard'],'Rare')
+
+train=train.drop(['Title','Survived'], axis = 1)
+test = test.drop('Title',axis=1)
+
+xtrain,xvalid,ytrain,yvalid = train_test_split(train,target,test_size=0.25)
+
+models = {"KNN": KNeighborsClassifier(),
+          'Logistic Regression':LogisticRegression(),
+          'RandomForest':RandomForestClassifier(),
+          'SVC':SVC(probability=True),
+          'DecisionTreeClassifier':DecisionTreeClassifier(),
+          'AdaBoostClassifier':AdaBoostClassifier(algorithm='SAMME', base_estimator=SecisionTreeCalssifier(), learning_rate=1.5, n_estimators=2,random_state=7),
+          'GradientBoostingClassifier':GradientBoostingClassifier(max_depth=4, max_features=0.3, min_samples_leaf=100,n_estimators=300),
+          'GaussianNB':GaussianNB(),
+          'LinearDiscriminantAnalysis':LinearDiscriminantAnalysis(),
+          'QuadraticDiscriminantAnalysis':QuadraticDiscriminantAnalysis()}
+
+scores={}
