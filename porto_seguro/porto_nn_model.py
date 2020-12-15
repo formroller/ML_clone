@@ -205,7 +205,7 @@ for c in cat_fea + ['new_ind','new_reg','new_car']:
 # XGBoost 기반 변수를 읽어온다.
 tarin_fea0, test_fea0 = pickle.load(open('./fea0.pk','rb'))
 
-# 수치형 변수의 결측값/이상값을 0으로 대체사고, 범주형 변수와 XGBoost 기반 변수를 통합한다.
+# 수치형 변수의 결측값/이상값을 0으로 대체하고, 범주형 변수와 XGBoost 기반 변수를 통합한다.
 train_list = [train_num.replace([np.inf, -np.inf, np.nan],0), train[cat_count_features], train_fea0]
 test_list = [test_nem.replace([np.inf, -np.inf, np.nan],0), test[cat_count_features], test_fea0]
 
@@ -223,7 +223,7 @@ X = sparse.hstack(tarin_list).tocsr()
 X_test = sparse.hstack(test_list).tocsr()
 all_data = np.vstack([X.toarray(),X_test.toarray()])
 
-# 인공 신경망 학습을 위해 모든 변수값ㅇ르 -1 ~ 1로 Scaling한다.
+# 인공 신경망 학습을 위해 모든 변수값을 -1 ~ 1로 Scaling한다.
 scaler = StandardScaler()
 scaler.fit(all_data)
 X = scaler.transform(X.toarray())
