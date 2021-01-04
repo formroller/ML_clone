@@ -1,0 +1,123 @@
+# =============================================================================
+# # Model2 : Lgbm Ensemble with different features
+# =============================================================================
+# 1.libraries 
+# pip install eli5  * permutation importance ()
+import pandas as pd
+import numpy as np
+
+from string import ascii_lowercase
+from itertools import combinations
+
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import roc_auc_score
+
+from lightgbm import LGBMRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+from sklearn.ensemble import RandomForestRegressor
+import eli5 
+from eli5.sklearn import PermutationImportance # 빠름/사용범위넓음/일관된 feature 중요도 측정 가능
+# 변수가 굉장히 많아 feature selection을 통해 변수를 제거할 필요가 있는 경우 PermutationImportance 활용하면 도움
+# https://hong-yp-ml-records.tistory.com/51
+import matplotlib.pyplot as plt
+
+import warnings
+import gc #??
+# https://medium.com/dmsfordsm/garbage-collection-in-python-777916fd3189 
+warnings.filterwarnings('ignore')
+
+# 2.Loading Data
+train = pd.read_csv('./train.csv')
+test = pd.read_csv('./test_x.csv')
+# 3. Feature Engineering
+x_train = train.copy()
+x_train.drop('voted', axis=1, inplace=True)
+y_train = train['voted']
+
+dataset = [x_train,test]
+
+# 마키아밸리 테스트 FE
+questions = [i for i in list(ascii_lowercase)[:20]]
+answer = [('Q'+i+'A') for i in questions]
+
+for data in dataset:
+    data['T'] = data['QcA'] - data['QfA'] + data['QoA'] - data['QrA'] + data['QsA']
+    data['V'] = data['QbA'] - data['QeA'] + data['QhA'] + data['QjA'] + data['QmA'] - data['QqA']
+    data['M'] = -data['QkA']
+    
+flipping_columns = ['QeA','QfA','QkA','QqA','QrA']
+for data in dataset:
+    for flip in flipping_columns:
+        data[flip] = 6-data[flip]
+        
+flipping_secret_columns = ['QaA','QdA','QgA','QiA','QnA']
+for data in dataset:
+    for flip in flipping_secret_columns:
+        data[flip] = 6 - data[flip]
+        
+for data in dataset:
+    data['delay'] = data[[('Q'+i+'E')for i in questions]].sum(axis=1)
+    data['delay'] = data['delay']**(1/10)
+    data['delay_vr'] = data['delay'].var()
+    
+Ancoms = list(combinations(answer, 2))
+for data in dataset:
+    for a,b, in Ancoms:
+        data['mach_%s_dv_%s'%(a,b)] = data[a]/data[b]
+        
+for data in dataset:
+    data['mach_var'] = data[answer].var(axis=1)
+    
+# 그 외 features
+tps = ['tp01','tp02','tp03','tp04','tp05','tp06','tp07','tp08','tp09','tp10']
+for data in dataset:
+    for tp in tps:
+        data[tp] = 7 - data[tp]
+        
+# tipi feature들을 일반적인 형태로 복구
+for data in dataset:
+    for tp in tps:
+        data[tp] = data[tp].replace(0,np.nan)
+        mean = data[tp].mean(axis=0)
+        data[tp] = data[tp].replace(np.nan, mean)
+        
+# tp중 무응답 값들을 평균값으로 대체
+for data in dataset:
+    data['Ex'] = data['tp01'] - data['tp06']
+    data['Ag'] = data['tp07'] - data['tp02']
+    data['Con'] = data['tp03'] - data['tp08']
+    data['Es'] = data['tp09'] - data['tp04']
+    data['Op'] = data['tp05'] - data['tp10']
+    
+index = test['index']
+for data in dataset:
+    data.drop('index',axis=1,inplace=True)
+    
+for data in dataset:
+    teenager_ox = 1*np.array(data['age_group']=='10s')
+# 10대 여부가 투표에 영향을 미칠 수 있으므로 새로운 컬럼 생성
+
+tpcoms = list(combinations(tps, 2))
+for data in dataset:
+    for a,b in tpcoms:
+        data['tp_%s_dv_%s'%(a,b)]=data[a]/data[b]
+#=> tp 값들끼리 나눈 feature들 생성
+
+encoder=LabelEncoder()
+needenco=['age_group','gender','race','religion']
+for i in needenco:
+    x_train[i] = encoder.fit_transform(x_train[i])
+    test[i] = encoder.transform(test[i])
+    
+    
+for data in dataset:
+    data['Es_gender'] = data['Es']*data['gender']
+    data['Con_gender'] = data['Con']*data['gender']
+    data['Op_gender'] = data['Op'] * data['gender']
+    
+# EDA결과 성별에 따라 Emotinal Stability/Conscience/Open Minede가 투표 여부에 미치는 영향이 크다 판단되어 feature를 추가
+# 정보 출처: https://www.sciencedirect.com/science/article/abs/pii/S0261379413001613
+
+# 4. Feature Selection 1 & Model 2-1
