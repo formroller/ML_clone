@@ -1,0 +1,132 @@
+# =============================================================================
+# 심리성향 예측 대회
+# =============================================================================
+import os 
+os.chdir('C:/Users/BIOJEAN/kaggle/dacon_psycho')
+# https://dacon.io/competitions/official/235647/codeshare/1812?page=1&dtype=recent&ptype=pub
+
+# libraries
+import pandas as pd 
+# import pandas_profiling 
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+from string import ascii_lowercase
+from itertools import combinations
+
+import lightgbm as lgb
+from sklearn.ensemble import RandomForestClassifier
+from lightgbm import LGBMClassifier
+
+from sklearn.ensemble import VotingClassifier #?
+from sklearn.model_selection import KFold
+from sklearn.model_selection import cross_val_score
+
+# loading data
+train = pd.read_csv('train.csv')
+test = pd.read_csv('test_x.csv')
+# EDA
+train.head()
+test.head()
+
+train.info()
+test.info()
+
+# QA & QE
+eda_train=train.copy()
+
+answer = ['QaA','QbA','QcA','QdA','QeA',
+          'QfA','QgA','QhA','QiA','QjA',
+          'QkA','QlA','QmA','QnA','QoA',
+          'QpA','QqA','QrA','QsA','QtA']
+
+correlations = eda_train[answer].corr(method='spearman')  # speraman
+sns.heatmap(correlations, cmap='coolwarm',square=True,center=0)
+
+
+for col in eda_train[answer]:
+    print(sorted(eda_train[col].unique()))
+    
+flipping_columns=['QeA','QfA','QkA','QqA','QrA']
+for flip in flipping_columns:
+    eda_train[flip]=6-eda_train[flip] # 부정 columns
+    
+correlations = eda_train[answer].corr(method='spearman')
+sns.heatmap(correlations, cmap='coolwarm', square=True, center=0)
+
+
+questions = [i for i in list(ascii_lowercase)[:20]]
+eda_train['delay'] = eda_train[[('Q'+i+'E') for i in questions]].sum(axis=1)
+eda_train['delay'] = eda_train['delay'] ** (1/10)
+sns.distplot(eda_train['delay'],rug=True) # delay column 분포 고르게 하기위해 10승 트
+
+# other features
+voted = eda_train[eda_train['voted']==1]
+unvoted = eda_train[eda_train['voted']==2]
+
+plt.figure(figsize=(8,6))
+sns.countplot(data=eda_train, x='age_group',hue=eda_train['voted'] )
+sns.countplot(data=eda_train, x='urban',hue=eda_train['voted'] )
+sns.countplot(data=eda_train, x='race',hue=eda_train['voted'] )
+sns.countplot(data=eda_train, x='married',hue=eda_train['voted'])
+sns.countplot(data=eda_train, x='gender',hue=eda_train['voted'] )
+sns.countplot(data=eda_train, x='religion',hue=eda_train['voted'] )
+sns.countplot(data=eda_train, x='familysize',hue=eda_train['voted'] )
+
+# Feature Engineering
+x_train = train.copy()
+x_train.drop('voted',axis=1, inplace=True)
+y_train = train['voted']
+
+dataset=[x_train, test]
+
+# 마키아밸리 테스트 FE
+questions=[i for i in list(ascii_lowercase)[:20]]
+answer = [('Q'+i+'A') for i in questions]
+
+# tatic/morality/view에 따라 feature 항목을 나눠보았습니다.
+for data in dataset:
+    data['T'] = data['QcA'] - data['QfA'] + data['QoA'] - data['QrA'] + data['QsA']
+    data['V'] = data['QbA'] - data['QeA'] + data['QhA'] +data['QjA'] +data['QmA']-data['QqA']
+    data['M'] = -data['QkA']
+
+
+for data in dataset:
+    for flip in flipping_columns:
+        data[flip] = 6 - data[flip]
+
+for data in dataset:
+    data['Mach_score'] = data[answer].mean(axis=1)
+
+for data in dataset:
+    data['delay'] = data[[('Q'+i+'E') for i in questions]].sum(axis=1)
+    data['delay'] = data['delay'] ** (1/10)
+    
+Acoms = list(combinations(answer, 2))
+for data in dataset:
+    for a,b in Acoms:
+        data['%s_dv_%s'%(a,b)] = data[a]/data[b]
+        
+for data in dataset:
+    data.drop([('Q'+i+'A') for i in questions], axis=1, inplace =True)
+    data.drop([('Q'+i+'E') for i in questions], axis=1, inplace =True)
+
+
+# 그 외 features
+for data in dataset:
+    data.drop('hand',axis=1,inplcae=True)
+
+wr_list = [('wr_0'+str(i)) for i in range(1,10)]
+wr_list.extend([('wr_'+str(i)) for i in range(10,14)])
+wr_no_need = [i for i in wr_list if i not in ['wr_01','wr_03','wr_06','wr_09','wr_11']]
+#=> EDA후 결과에 영향이 없다고 판단된 feature들을 제거
+for data in dataset:
+    data.drop(wr_no_need, axis=1, inplace=True)
+    
+for data in dataset:
+    data['Ex'] = data['tp01'] - data['tp06']
+    data['Ag'] = data['tp07'] - data['tp02']
+    data['Con'] = data['tp03'] - data['tp08']
+    data['Es'] = data['tp09'] - data['tp04']
+    data['Op'] = data['tp05'] - data['tp10']
+    
