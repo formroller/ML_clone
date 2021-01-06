@@ -3,6 +3,23 @@
 # =============================================================================
 # 1.libraries 
 # pip install eli5  * permutation importance ()
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+from string import ascii_lowercase
+from itertools import combinations
+
+import lightgbm as lgb
+from sklearn.ensemble import RandomForestClassifier
+from lightgbm import LGBMClassifier
+from sklearn.ensemble import GradientBoostingClassifier
+
+from sklearn.ensemble import VotingClassifier #?
+from sklearn.model_selection import KFold
+from sklearn.model_selection import cross_val_score
+
+
 import pandas as pd
 import numpy as np
 
@@ -18,14 +35,20 @@ from sklearn.preprocessing import StandardScaler
 
 from sklearn.ensemble import RandomForestRegressor
 import eli5 
-from eli5.sklearn import PermutationImportance # 빠름/사용범위넓음/일관된 feature 중요도 측정 가능
+from eli5.sklearn import PermutationImportance 
+# PermutationImportance
+# 빠름/사용범위넓음/일관된 feature 중요도 측정 가능
 # 변수가 굉장히 많아 feature selection을 통해 변수를 제거할 필요가 있는 경우 PermutationImportance 활용하면 도움
 # https://hong-yp-ml-records.tistory.com/51
 import matplotlib.pyplot as plt
 
 import warnings
 import gc #??
+# gc (Garbage Collection)
+# 생성된 객체들을 순회하며 해당 객체가 현재 쓰이는 곳이 없을 경우 자동으로 해제한다.
+# 사용자는 gc가 쓸모없어진 객체들을 잘 해제할 수 있도록 레퍼런스 카운트에 신경써야 한다
 # https://medium.com/dmsfordsm/garbage-collection-in-python-777916fd3189 
+# https://wikidocs.net/13969
 warnings.filterwarnings('ignore')
 
 # 2.Loading Data
@@ -121,3 +144,160 @@ for data in dataset:
 # 정보 출처: https://www.sciencedirect.com/science/article/abs/pii/S0261379413001613
 
 # 4. Feature Selection 1 & Model 2-1
+
+def lgbm_rfe_4040(x_data, y_data, ratio=0.9, min_feats=40):
+    feats = x_data.columns.tolist()
+    archive = pd.DataFrame(columns=['model', 'n_feats', 'feats', 'score'])
+    while True:
+        model = LGBMClassifier(objective = 'binary', num_iterations=10**4)
+        x_train, x_val, y_train, y_val = train_test_split(x_data[feats], y_data, random_state=4040)
+        model.fit(x_train, y_train, eval_set=[(x_val, y_val)], early_stopping_rounds=100, verbose=False)
+        val_pred = model.predict_proba(x_val)
+        val_pred = val_pred[:,1]
+        score = roc_auc_score(y_val, val_pred)
+        n_feats = len(feats)
+        print(n_feats, score)
+        archive = archive.append({'model': model, 'n_feats': n_feats, 'feats': feats, 'score': score}, ignore_index=True)
+        feat_imp = pd.Series(model.feature_importances_, index=feats).sort_values(ascending=False)        
+        next_n_feats = int(n_feats * ratio)
+        if next_n_feats < min_feats:
+            break
+        else:
+            feats = feat_imp.iloc[:next_n_feats].index.tolist()
+    return archive
+
+    feats = x_data.columns.tolist()
+    archive = pd.DataFrame(columns=['model','n_feats','feats','score'])
+    while True:
+        model = LGBMClassifier(objective='binary',num_iteration=10**4)
+        x_train,x_val,y_train,y_val = train_test_split(x_data[feats],y_data, random_state=4040)
+        model.fit(x_train, y_train, eval_set=[(x_val,y_val)], early_stopping_rounds=100,verbose=False)
+        val_pred = model.predict_proba(x_val)
+        val_pred = val_pred[:,1]
+        score=roc_auc_score(y_val, val_pred)
+        n_feats = len(feats)
+        print(n_feats, score)
+        archive=archive.append({'model':model,'n_feats':n_feats,'feats':feats,'score':score}, ignore_index = True)
+        feat_imp=pd.Series(model.feature_importances_,index=False).sort_values(ascending=False)
+        next_n_feats = int(n_feats * ratio)
+        if next_n_feats < min_feats:
+            break
+        else:
+            feats = feat_imp.iloc[:next_n_feats].index.tolist()
+    return archive
+
+lgbm_archive_4040=lgbm_rfe_4040(x_train,y_train)
+
+model = LGBMClassifier(objective='binary',num_iteration=10**3)
+x_train_1 = x_train[lgbm_archive_4040.iloc[7,2]]
+model.fit(x_train_1, y_train)
+
+pred_y1 = model.predict_proba(test[lgbm_archive_4040.iloc[7,2]])
+pred_y1 = pred_y1[:,1]
+
+
+# 5. Feature Selection 2 & Model 2-2
+def lgbm_rfe_1234(x_data, y_data, ratio=0.9, min_feats=40):
+    feats = x_data.columns.tolist()
+    archive = pd.DataFrame(columns=['model', 'n_feats', 'feats', 'score'])
+    while True:
+        model = LGBMClassifier(objective = 'binary', num_iterations=10**4)
+        x_train, x_val, y_train, y_val = train_test_split(x_data[feats], y_data, random_state=1234)
+        model.fit(x_train, y_train, eval_set=[(x_val, y_val)], early_stopping_rounds=100, verbose=False)
+        val_pred = model.predict_proba(x_val)
+        val_pred = val_pred[:,1]
+        score = roc_auc_score(y_val, val_pred)
+        n_feats = len(feats)
+        print(n_feats, score)
+        archive = archive.append({'model': model, 'n_feats': n_feats, 'feats': feats, 'score': score}, ignore_index=True)
+        feat_imp = pd.Series(model.feature_importances_, index=feats).sort_values(ascending=False)
+        next_n_feats = int(n_feats * ratio)
+        if next_n_feats < min_feats:
+            break
+        else:
+            feats = feat_imp.iloc[:next_n_feats].index.tolist()
+    return archive
+lgbm_archive_1234 = lgbm_rfe_1234(x_train, y_train)
+
+
+model2 = LGBMClassifier(objective='binary',num_iterations=10**3)
+x_train_2 = x_train[lgbm_archive_1234.iloc[14,2]]
+model2.fit(x_train_2, y_train)
+
+pred_y2 = model2.predict_proba(test[lgbm_archive_1234.iloc[14,2]])
+pred_y2 = pred_y2[:,1]
+
+# 6. Feature Selection 3 & Model 2-3
+def lgbm_rfe_99087(x_data, y_data,ratio=0.9,min_feats=40):
+    feats = x_data.columns.tolist()
+    archive = pd.DataFrame(columns=['model','n_feats','feats','score'])
+    while True:
+        model=LGBMClassifier(objective='binary', num_iterations=10**4)
+        x_train,x_val,y_train,y_val = train_test_split(x_data[feats],y_data,random_state=99087)
+        model.fit(x_train,y_train,eval_set=[(x_val,y_val)], early_stopping_rounds=100, verbose=False)
+        
+        val_pred = model.predict_proba(x_val)
+        val_pred = val_pred[:,1]
+        
+        score = roc_auc_score(y_val, val_pred)
+        n_feats = len(feats)
+        print(n_feats, score)
+        
+        archive = archive.append({'model':model,'n_feats':n_feats, 'feats':feats, 'score':score}, ignore_index=True)
+        feat_imp = pd.Series(model.feature_importances_, index = feats).sort_values(ascending=False)
+        next_n_feats = int(n_feats * ratio)
+        
+        if next_n_feats < min_feats:
+            break
+        else:
+            feats = feat_imp.iloc[:next_n_feats].index.tolist()
+    return archive
+        
+lgbm_archive_99087 = lgbm_rfe_99087(x_train, y_train)
+
+model3 = LGBMClassifier(objective='binary', num_iterations=10**3)
+x_train_3 = x_train[lgbm_archive_99087.iloc[7,2]]
+model3.fit(x_train_3, y_train)
+
+pred_y3 = model3.predict_proba(test[lgbm_archive_99087.iloc[7,2]])
+pred_y3 = pred_y3[:,1]
+
+
+# 7. Feature Selection 4 & Model 2-4
+def lgbm_rfe_42(x_data,y_data, ratio=0.9, min_feats=40):
+    feats = x_data.columns.tolist()
+    archive = pd.DataFrame(columns=['model', 'n_feats', 'feats', 'score'])
+    while True:
+        model = LGBMClassifier(objective = 'binary', num_iterations=10**4)
+        x_train, x_val, y_train, y_val = train_test_split(x_data[feats], y_data, random_state=42)
+        model.fit(x_train, y_train, eval_set=[(x_val, y_val)], early_stopping_rounds=100, verbose=False)
+        val_pred = model.predict_proba(x_val)
+        val_pred = val_pred[:,1]
+        score = roc_auc_score(y_val, val_pred)
+        n_feats = len(feats)
+        print(n_feats, score)
+        archive = archive.append({'model': model, 'n_feats': n_feats, 'feats': feats, 'score': score}, ignore_index=True)
+        feat_imp = pd.Series(model.feature_importances_, index=feats).sort_values(ascending=False)
+        next_n_feats = int(n_feats * ratio)
+        if next_n_feats < min_feats:
+            break
+        else:
+            feats = feat_imp.iloc[:next_n_feats].index.tolist()
+    return archive
+
+lgbm_archive_42 = lgbm_rfe_42(x_train, y_train)
+
+model4 = LGBMClassifier(objective="binary", num_iterations= 10**3)
+x_train_4 = x_train[lgbm_archive_42.iloc[8,2]]
+model4.fit(x_train_4, y_train)
+
+pred_y4 = model4.predict_proba(test[lgbm_archive_42.iloc[8,2]])
+pred_y4 = pred_y4[:,1]
+
+# 8. Ensemble
+pred_all = (pred_y + pred_y2 + pred_y3 + pred_y4) * (1/4)
+submission = pd.DataFrame({
+    'index':index,
+    'voted':pred_all})
+
+# submission.to_csv('./model2.csv', index=False)
