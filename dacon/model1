@@ -5,7 +5,7 @@ import os
 os.chdir('C:/Users/BIOJEAN/kaggle/dacon_psycho')
 # https://dacon.io/competitions/official/235647/codeshare/1812?page=1&dtype=recent&ptype=pub
 
-# libraries
+# 1. libraries
 import pandas as pd 
 # import pandas_profiling 
 import seaborn as sns
@@ -17,53 +17,66 @@ from itertools import combinations
 import lightgbm as lgb
 from sklearn.ensemble import RandomForestClassifier
 from lightgbm import LGBMClassifier
+from sklearn.ensemble import GradientBoostingClassifier
 
 from sklearn.ensemble import VotingClassifier #?
 from sklearn.model_selection import KFold
 from sklearn.model_selection import cross_val_score
 
-# loading data
+# VotingClassifier : 다수결분류
+# 1) Hard Voting Classifier
+#  여러 모델을 생성하고 그 결과를 비교한다. 이때 Classifier 결과들을 집계해 가장 많은 표를 얻는 클래스를 최종 예측값으로 정한다.
+
+# 2) Soft Voting Classifier
+#  앙상블에 사용되는 모든 분류기가 클래스의 확률을 예측할 수 있을 때 사용한다. 각 분류기의 예측을 평균내 확률이 가장 높은 클래스로 예측(가중치 투표)
+# 출처
+# https://nonmeyet.tistory.com/entry/Python-Voting-Classifiers%EB%8B%A4%EC%88%98%EA%B2%B0-%EB%B6%84%EB%A5%98%EC%9D%98-%EC%A0%95%EC%9D%98%EC%99%80-%EA%B5%AC%ED%98%84
+
+# 2. loading data
 train = pd.read_csv('train.csv')
 test = pd.read_csv('test_x.csv')
-# EDA
+# 3. EDA
+# - 데이터 훑어보기
 train.head()
 test.head()
-
+# - Null값 & 자료형 확인
 train.info()
 test.info()
-
-# QA & QE
+# - QA & QE
 eda_train=train.copy()
-
 answer = ['QaA','QbA','QcA','QdA','QeA',
           'QfA','QgA','QhA','QiA','QjA',
           'QkA','QlA','QmA','QnA','QoA',
           'QpA','QqA','QrA','QsA','QtA']
-
-correlations = eda_train[answer].corr(method='spearman')  # speraman
+correlations = eda_train[answer].corr(method='spearman')  # speraman, 
 sns.heatmap(correlations, cmap='coolwarm',square=True,center=0)
-
+# => 부호가 같은 문항끼리는 corr값이 양수, 반대일 경우 음수
+# => correlation시 prearson을 많이 사용하지만, 전제 조건인 linear relationship을 예상하지 않아
+#    monotonic relationship을 전제로 하는 spearman correlation사용
+# https://support.minitab.com/en-us/minitab-express/1/help-and-how-to/modeling-statistics/regression/supporting-topics/basics/a-comparison-of-the-pearson-and-spearman-correlation-methods/
+# (pearson, spearman 비교)
 
 for col in eda_train[answer]:
-    print(sorted(eda_train[col].unique()))
+    print(sorted(eda_train[col].unique())) # 이미 알고있는 -부호 문항을 reverse처리
     
 flipping_columns=['QeA','QfA','QkA','QqA','QrA']
 for flip in flipping_columns:
-    eda_train[flip]=6-eda_train[flip] # 부정 columns
+    eda_train[flip]=6-eda_train[flip] # (-)부호인 Secret 문항을 reverse 처리하기.
     
 correlations = eda_train[answer].corr(method='spearman')
 sns.heatmap(correlations, cmap='coolwarm', square=True, center=0)
-
+# 5개의 파란줄 : ['QaA','QdA','QgA','QiA','QnA'], ((-) 부호를 가진 문항)
 
 questions = [i for i in list(ascii_lowercase)[:20]]
 eda_train['delay'] = eda_train[[('Q'+i+'E') for i in questions]].sum(axis=1)
 eda_train['delay'] = eda_train['delay'] ** (1/10)
-sns.distplot(eda_train['delay'],rug=True) # delay column 분포 고르게 하기위해 10승 트
+sns.distplot(eda_train['delay'],rug=True) # delay column 분포 고르게 하기위해 10승 루트
 
-# other features
+# - other features
 voted = eda_train[eda_train['voted']==1]
 unvoted = eda_train[eda_train['voted']==2]
 
+# - 시각화
 plt.figure(figsize=(8,6))
 sns.countplot(data=eda_train, x='age_group',hue=eda_train['voted'] )
 sns.countplot(data=eda_train, x='urban',hue=eda_train['voted'] )
@@ -73,22 +86,21 @@ sns.countplot(data=eda_train, x='gender',hue=eda_train['voted'] )
 sns.countplot(data=eda_train, x='religion',hue=eda_train['voted'] )
 sns.countplot(data=eda_train, x='familysize',hue=eda_train['voted'] )
 
-# Feature Engineering
+# 4.Feature Engineering
 x_train = train.copy()
 x_train.drop('voted',axis=1, inplace=True)
 y_train = train['voted']
+dataset = [x_train, test]
 
-dataset=[x_train, test]
+# - 마키아밸리 테스트 FE
+questions = [i for i in list(ascii_lowercase)[:20]]
+answers = [('Q'+i+'A') for i in questions]
 
-# 마키아밸리 테스트 FE
-questions=[i for i in list(ascii_lowercase)[:20]]
-answer = [('Q'+i+'A') for i in questions]
-
-# tatic/morality/view에 따라 feature 항목을 나눠보았습니다.
 for data in dataset:
-    data['T'] = data['QcA'] - data['QfA'] + data['QoA'] - data['QrA'] + data['QsA']
-    data['V'] = data['QbA'] - data['QeA'] + data['QhA'] +data['QjA'] +data['QmA']-data['QqA']
-    data['M'] = -data['QkA']
+  data['T'] = data['QcA'] - data['QfA'] + data['QoA'] - data['QrA'] + data['QsA']
+  data['V'] = data['QbA'] - data['QeA'] + data['QhA'] + data['QjA'] + data['QmA'] - data['QqA']
+  data['M'] = - data['QkA']
+# - Tatic/Morality/View에 따라 feature 항목을 나누기.
 
 
 for data in dataset:
@@ -112,9 +124,9 @@ for data in dataset:
     data.drop([('Q'+i+'E') for i in questions], axis=1, inplace =True)
 
 
-# 그 외 features
+# - 그 외 features
 for data in dataset:
-    data.drop('hand',axis=1,inplcae=True)
+    data.drop('hand',axis=1,inplace=True)
 
 wr_list = [('wr_0'+str(i)) for i in range(1,10)]
 wr_list.extend([('wr_'+str(i)) for i in range(10,14)])
@@ -129,4 +141,43 @@ for data in dataset:
     data['Con'] = data['tp03'] - data['tp08']
     data['Es'] = data['tp09'] - data['tp04']
     data['Op'] = data['tp05'] - data['tp10']
+# => TIPI test에 따라 feature항목 나눠두기(flip)형태이나 따로 전처리 하지 않음)
+# TIPI : 성격유형검사
+
+for data in dataset:
+    data.drop([('tp0'+str(i)) for i in range(1,10)], axis=1, inplace=True)
+    data.drop('tp10',axis = 1, inplace=True)
+
+index = test['index']
+for data in dataset:
+    data.drop('index',axis=1,inplace=True)
     
+from sklearn.preprocessing import LabelEncoder
+encoder = LabelEncoder()
+needenco = ['age_group','gender','race','religion']
+
+for i in needenco:
+    x_train[i] = encoder.fit_transform(x_train[i])
+    test[i] = encoder.transform(test[i])
+    
+# 5.Model
+k_fold = KFold(n_splits = 3, shuffle = True, random_state=0)
+
+clf1 = RandomForestClassifier(n_estimators=500)
+clf2 = LGBMClassifier()
+clf3 = GradientBoostingClassifier()
+soft_vote = VotingClassifier([('r1',clf1),('r2',clf2),('r3',clf3)], voting='soft')
+soft_vote.fit(x_train,y_train)
+
+model = soft_vote
+pred_y = model.predict_proba(test)
+pred_y = pred_y[:,1]
+
+submission = pd.DataFrame({
+    'index':index,
+    'voted':pred_y
+    })
+
+# submission.to_csv('./model1.csv', index=False)
+
+
