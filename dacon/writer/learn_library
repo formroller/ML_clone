@@ -1,0 +1,256 @@
+# =============================================================================
+# (dacon) writer
+# =============================================================================
+
+## 1.Libraries
+1) nltk (Natural Language ToolKit)
+- 자연어 처리를 위한 파이썬 패키기(아나콘다 설치시 기본적으로 설치.)
+- nltk 기능을 제대로 사용하기 위해서는 nltk data라는 여러 데이터를 추가적으로 설치해야한다.
+(기능)
+ 1) 말뭉치
+ 2) 토큰 생성
+ 3) 형태소 분석
+ 4) 품사 태깅
+
+1-2)
+말뭉치 : 자연어 분석 작업을 위해 만든 샘플 문서 집합.
+        품사, 형태소 등의 보조적인 의미를 추가하고 쉬운 분석읠 위해 구조적 형태로 정리한 것.
+
+토큰 : 문자열 단위 
+      자연어 문서 분석하기 위해 긴 문자열을 분석 위한 작은 단위로 나누어야 하고 이 문자열 단위를 토큰이라 한다.
+      이렇게 문자열을 토큰으로 나누는 작업을 토큰 생성(Tokenizing)이라 한다.
+
+형태소 분석: 일정한 의미가 있는 가장 작은 말의 단위
+            보통 자연어 처리에서는 토큰으로 형태소를 이용한다.
+            - 어간 추출(stemming)
+            - 원형 복원(lemmatizing)
+            - 품사 부착(Part-of-Speech tagging)
+
+품사 부착 : 낱말을 문법적인 기능이나 형태, 뜻에 따라 구분한것.            
+
+
+2) word_tokenize
+from nltk import wrod_tokenize
+
+- space단위와 구두점(punctuation)을 기준으로 토큰화(Tokenize)한다.
+
+3) stopwords
+from nltk.corpus import stopwords
+
+- 불용어 제거
+불용어 : 분석에 큰 의미가 없는 단어를 지칭
+        (the, a, an, is, I, my)
+
+4) log_loss
+from sklearn.metrics import log_loss
+
+- 최적화된 coefficients(계수)와 intercept(절편)를 구하기 위해,
+  주어진 모델이 데이터에 얼마나 fit한지 측정하는 기준이 필요하며, 이를 ML에서는 lost function 혹은 cost function 이라한다.
+
+모델이 데이터에 'fit'한걸 측정하기 위새 먼저 각 데이터에 대한 loss를 계산 한 뒤 loss의 평균을 내야한다.
+Logistic Regression에서의 loss function은 Log Loss라 하며, 공식은 참고 사이트에 있다.
+
+m : 전체 데이터 개수
+y^(i) : i번째 데이터의 class
+a^(i) : i번쩨 데이터의 log-odds 값에 sigmoid를 취한값.
+        즉, i번째 데이터가 positive class에 속할 확률을 나타낸 값. (0 <= a^(i) <= 1)
+
+5) Pipeline
+from sklearn.pipeline import Pipeline
+
+- 할 일의 순서를 하나씩 넣어주는 객체를 사용한다.(개념)
+
+6) CountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer
+
+- 문서 집합에서 단어 토큰을 생성하고 각 단어의 수를 세어 BOW인코딩 벡터를 만든다.
+* BoW(Bag of Words), 단어들의 순서는 고려하지 않고, 단어들의 출현 빈도에만 집중하는 텍스트 데이터의 수치화 표현 방법.
+
+6-2) TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+- CounterVectorizer와 비슷하나 TF-IDF 방식으로 단어의 가중치를 조정한 BOW 인코딩 벡터를 만든다.
+(TF-IDF 개념 - 특징 추출)
+* TF : Term Frequency의 약자.
+       특정 단어의 등장 빈도를 의미한다.     
+* DF : Document Frequency의 약자.
+       특정 단어가 나타나는 문서의 수.
+* IDF : 역수 변환.
+
+6-3) TfidfTransformer
+from sklearn.feature_extraction.text import TfidfTransformer
+
+- 개수 행렬을 정규화된 TF 또는 TF-IDF 표현으로 변환한다.
+
+7) MultinomialNB
+from sklearn.naive_bayes import MultinomialNB
+
+* 다항 분포 나이브 베이즈.
+* 클래스별로 특성의 평균을 계산
+* 보통 0이 아닌 특성이 비교적 많은 데이터셋에서 BernoulliNB보다 성능이 높다.
+
+7-2) BerrnoulliNB
+from sklearn.naive_bayes import BernoulliNB
+
+- 0 또는 1을 가진 이진 변수.
+* 각 클래스의 특성 중 0이 아닌 것이 몇개인지 센다.
+
+
+8) CalibratedClassifierCV #??
+from sklearn.calibration import CalibratedClassifierCV
+
+- 분류 문제는 클래스 값을 직접 예측하는 것보다 클래스에 속하는 관찰 확률을 예측하는 것이 편리할 수 있다.
+- 각 클래스에 대한 예상 확률 분포와 일치하는 예측 확률을 보정된(calibration) 확률이라 한다.
+
+9) keras
+- 파이썬으로 작성된 고수준 신경망 API로 TensorFlow, CNTK 혹은 Theano와 함께 사용할 수 있다.
+* 사용자 친근성
+* 모듈성
+* 쉬운 확장성
+* python 작업(Work with Python)
+
+9-1) K
+from keras import backend as K
+
+
+* Keras는 딥러닝 모델을 개발하기 위한 고수준의 구성요소를 제공하는 모델 레벨의 라이브러리이다.
+* Keras는 텐서 곱셈, 합성곱 등의 저수준 연산을 제공하지 않는 대신, '백엔드 엔진' 역할을 하는 
+  특수하고 최적화 된 텐서 라이브러리에 의존한다.
+
+* 현재 Keras는 TensorFlow, Theano, CNTK 세 가지 백엔드를 지원한다.
+
+9-2) np_utils
+from keras.utils import np_utils
+
+* np_utils.to_categorical() 형태로 사용, (라벨링)
+
+9-3) Sequential
+from keras.models import Sequential
+
+- 인공 신경망 챕터에서 입력층, 은닉층, 출력층 등을 구성하기 위해 사용.
+- 계층을 선형으로 쌓은 것.
+
+9-4.a) GlobalAveragePooling1D
+from keras.layers import GlobalAveragePooling1D
+
+* 각 feature map 상의 노드값들의 평균을 뽑아낸다.
+
+9-4.b) Conv1D
+from keras.layers import Conv1D
+
+- 단일 공간(시간)적 차원에서 레이어와 컨볼수션되는 컨볼루션 커널을 생성해 아웃풋의 텐서를 만들어낸다.
+- 합성곱의 방향에 따라 1D, 2D, 3D로 사용.
+9-4.c) Maxpooling1D
+from keras.layers import MaxPool1D
+
+- Max Pooling Layer에서 뽑아내는 노드의 값은 window상에서 포함하고있는 픽셀들 중 최댓값을 뽑아낸다.
+
+9-5.a) Dense
+from keras.layers.core import Dense
+
+- 입력과 출력을 모두 연결해준다. 예를 들어 입력 뉴런이 4개, 출력 뉴런이 8개 있다면 총 연결선은 32개이다.
+  각 연결선에는 가중치(weight)를 포함하고 있는데, 이 가중치가 나타내는 의미는 연결강도라고 보면 된다.
+  
+
+9-5.b) Activation
+from keras.layers.core import Activation
+
+- 활성화 함수
+- 아웃풋에 활성화 함수를 적용한다.
+
+9-5.c) Dropout
+from keras.layers.core import Dropout
+
+keras.layers.Dropout(rate, noise_shape=None, seed=None)
+
+- Dropout은 학습 과정 중 각 업데이트에서 임의로 인풋 유닛을 0으로 설정하는 비율(rate)로 구성되는데, 이는 과적합 방지에 도움을 준다.
+* 인풋에 드롭아웃을 적용한다.
+
+9-6) Embedding
+from keras.layers.embeddings import Embedding
+
+- 어떤 데이터를 벡터를 바꾸는 것
+  (벡터로 바꾸므로 산술연산이 가능하고, 머신러닝에 활용할 수 있다.)
+
+9-7) BatchNormalization
+from keras.layers.normalization import BatchNormalization
+
+- Grdient Vanishing / Grdient Exploding이 일어나지 않도록 하는 아이디어 중 하나.
+- BatchNormalization에서는 각 layer에 들어가는 input을 normailze 시킴으로 layer의 학습을 가속하는데,
+  이 때 whitening 등의 방법을 쓰는 대신 각 mini-batch의 mean과 variance를 구해 normailze한다.
+
+
+9-8.a) sequence
+from keras.preprocessing import sequence
+
+- 시간적 데이터 배치를 생성하는 유틸리티 클래스
+- 일정 간격으로 수집된 데이터 포인트의 시퀀스를 보폭, 시계의 길이 등 시계열 매개변수를 전달받아 학습/검증 목적의 배치를 생성한다.
+* pad_sequences, 시퀀스를 패딩해 동일한 길이로 만든다.
+
+9-8.b) text
+from keras.preprocessing import text
+
+10) Tokenizer
+from kears.preprocessing.text import Tokenizer
+
+- 텍스트 토큰화 유틸리티 클래스
+- 이 클래스는 각 텍스트를 정수 시퀀스로, 혹은 단어 실셈이나 tf-idf 등을 기반으로
+  각 토큰의 계수가 이진인 벡터로 변환해 말뭉치를 벡터화할 수 있도록 해준다.
+
+11) pad_sequences
+from keras.preprocessing.sequence import pad_sequences
+
+12) EarlyStopping
+from kears.callback import EarlyStopping
+
+- Epoch를 많이 돌린 후 특정 시점에서 멈추는 것.
+  그 특정 시점을 어떻게 정하느냐가 Early Stoppinf의 핵심이라 할 수 있다.
+  일반적으로 hold-out validation set에서의 성능이 더이상 증가하지 않을때 학습을 중지시키게 된다.
+
+
+
+# =============================================================================
+# 참고
+# =============================================================================
+1) nltk, https://wikidocs.net/22488
+1-2) nltk, https://datascienceschool.net/03%20machine%20learning/03.01.01%20NLTK%20%EC%9E%90%EC%97%B0%EC%96%B4%20%EC%B2%98%EB%A6%AC%20%ED%8C%A8%ED%82%A4%EC%A7%80.html
+2) word_tokenize, https://excelsior-cjh.tistory.com/63
+3) stopwords, https://bkshin.tistory.com/entry/NLP-3-%EB%B6%88%EC%9A%A9%EC%96%B4Stop-word-%EC%A0%9C%EA%B1%B0
+4) log_loss, https://eunsukimme.github.io/ml/2019/10/22/Logistic-Regression/
+5) Pipeline, https://blog.naver.com/gdpresent/221730873049
+             https://pinkwink.kr/1278
+6) CountVectorizer, https://datascienceschool.net/03%20machine%20learning/03.01.03%20Scikit-Learn%EC%9D%98%20%EB%AC%B8%EC%84%9C%20%EC%A0%84%EC%B2%98%EB%A6%AC%20%EA%B8%B0%EB%8A%A5.html             
+                    https://wikidocs.net/22650
+6-2) TfidfVectorizer(TF-IDF), https://chan-lab.tistory.com/24
+6-3) TfidfTransformer, https://ogrisel.github.io/scikit-learn.org/sklearn-tutorial/modules/generated/sklearn.feature_extraction.text.TfidfTransformer.html
+                       https://www.kite.com/python/docs/sklearn.feature_extraction.text.TfidfTransformer
+7) MultinomialNB, https://metamath1.github.io/2017/05/19/naive-bayes.html
+7-2) BernoulliNB, https://dlsdn73.tistory.com/757
+
+GaussianNB : 연속적인 데이터 (클래스별로 각 특성의 표준편차와 평균을 저장)
+BerrnoulliNB : 이진 데이터  
+MultinomialNB : 카운트 데이터 (클래스별로 특성의 평균을 계산) 
+BerrnoulliNB, MultinomialNB는 대부분 text에 사용.
+위 두가지 모델의 모델 복잡도는 alpha로 조절.
+
+8) CalibratedClassifierCV, https://machinelearningmastery.com/calibrated-classification-model-in-scikit-learn/
+9) keras, https://keras.io/ko/
+          https://wikidocs.net/32105
+9-1) backend, https://keras.io/ko/backend/
+9-2) np_utils, https://m.blog.naver.com/jeonghj66/221761816570
+9-3) Sequnetial, https://wikidocs.net/32105
+                 https://www.codeonweb.com/entry/fe7882d2-e42a-4ef3-bbc2-e616d366e013
+                 
+9-4.a) Grobal Average Pooling(=GAP)), https://kevinthegrey.tistory.com/142
+9-4.b) Conv1d, https://keras.io/ko/layers/convolutional/
+               https://wiserloner.tistory.com/906 
+9-4.c) MaxPool1D, https://kevinthegrey.tistory.com/142
+9-5.a) **Dense, https://tykimos.github.io/2017/01/27/MLP_Layer_Talk/
+9-5.b) Activation, https://keras.io/ko/activations/
+9-5.c) Dropout, https://keras.io/ko/layers/core/
+9-6) Embedding, https://heegyukim.medium.com/keras-embedding%EC%9D%80-word2vec%EC%9D%B4-%EC%95%84%EB%8B%88%EB%8B%A4-619bd683ded6
+9-7) BatchNormalization, https://wikidocs.net/84506
+9-8.a,11) sequences, https://keras.io/ko/preprocessing/sequence/
+
+9-8.b,10) text, Tokenizer, https://keras.io/ko/preprocessing/text/
+12) EarlyStopping, https://3months.tistory.com/424
