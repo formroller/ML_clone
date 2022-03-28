@@ -1,0 +1,289 @@
+[전복 나이 예측하기 EDA](https://www.kaggle.com/code/ragnisah/eda-abalone-age-prediction)
+
+# 데이터 불러오기
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from scipy.stats import skew
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.feature_selection import SelectKBest
+from sklearn.metrics import r2_score, mean_squared_error
+
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.linear_model import Ridge
+from sklearn.svm import SVR
+
+import warnings
+warnings.filterwarnings('ignore', category=DeprecationWarning)
+
+data = pd.read_csv('abalone.csv')
+
+먼저 문제 문제와 변수 설명으로부터 'Age' 변수를 계산해 데이터 세트에 할당한다. (Age = 1.5+Rings)
+
+data['age'] = data['Rings'] + 1.5
+data.drop('Rings', axis =1, inplace=True)
+
+# 단변량 분석
+---
+다양한 내장 함수를 통해 변수를 통계적으로 이해하기.
+
+print(f"This dataset has {data.shape[0]} observation with {data.shape[1]} features.")
+
+data.columns
+
+data.info()
+
+data.describe().T
+
+**Key insights:**
+ - 데이터 셋에는 결측치가 없다.
+ - 'sex'를 제외한 모든 변수는 수치형
+ - 변수는 정상 분포(normal distributed)되어 있지 않지만, 정상(normal)에 가깝다.
+ - 'Height'를 제외하고, 변수들중 최솟값이 0인 값이 없다.(재확인 필요)
+ - 각각의 변수들은 다른 값의 범위를 가지고 있다.
+ 
+
+data.hist(figsize=(20,10), grid=False, layout=(2,4), bins=30)
+
+numerical_features = data.select_dtypes(include=[np.number]).columns
+categorical_features = data.select_dtypes(include=[np.object]).columns
+
+numerical_features
+
+categorical_features
+
+skew_values=skew(data[numerical_features], nan_policy = 'omit')
+dummy = pd.concat([pd.DataFrame(list(numerical_features), columns=['Features']),
+                  pd.DataFrame(list(skew_values), columns=['Skewness Degree'])], axis=1)
+dummy.sort_values(by='Skewness Degree', ascending = False)
+
+일반적으로 분산된 데이터의 경우, 왜곡은 약 0이어야 한다.   
+단봉(unimodal<>bimodal, 쌍봉) 연속 분포의 경우 왜곡값(skewness vlaue) > 0은 분포의 오른쪽 꼬리에 더 많은 무게가 있음을 의마한다. skewtest 함수는(함수 왜곡 테스트) 왜곡값이 통계적으로 0에 충분히 가까운지 결정하는 데 사용될 수 있다.
+
+# Missinb values
+missing_values = data.isnull().sum().sort_values(ascending = False)
+percentage_missing_values = (missing_values/len(data))*100
+pd.concat([missing_values, percentage_missing_values], axis=1, keys = ['Missing vlaues', '%Missing'])
+
+
+앞서 말한 것처럼 누락값은 없다.
+
+sns.countplot(x='Sex', data=data, palette='Set3')
+
+plt.figure(figsize=(20,7))
+sns.swarmplot(x='Sex', y='age', data=data, hue='Sex')
+sns.violinplot(x='Sex', y='age', data=data)
+
+* Male : 대다수는 7.5 ~ 19세이다.
+* Female : 대부분 8 ~ 19세이다.
+* Immature : 대부분 6 ~10세 미만이다.
+
+data.groupby('Sex')[['Length', 'Diameter', 'Height', 'Whole weight', 'Shucked weight', 
+                    'Viscera weight', 'Shell weight', 'age']].mean().sort_values('age')
+
+# 이변량 분석
+---
+이변량 분석은 데이터 분석 프로세스의 중요한 부분이며, 각 변수에 다른 변수들이 있을 때 어떤 영향을 받는지에 대한 명확한 그림을 제공한다. 
+
+또한 중요한 변수를 이해 및 식별하고 다중공선성 효과, 상호 의존성을 극복해 숨겨진 데이터 노이즈에 패턴에 대한 통찰력을 제공한다. 
+
+sns.pairplot(data[numerical_features])
+
+주요 insights인 length는 diameter와 선형 관계가 있는 반면  
+height, whole weight, shucked weight, viscera weight, shell weight는 비선형 관계인 것을 볼 수 있다. 
+
+plt.figure(figsize=(20,15))
+sns.heatmap(data[numerical_features].corr(), annot=True)
+
+- Whole Weight는 age 변수를 제외한 거의 대부분의 변수와 선형 관계이다.
+- Height는 다른 변수와 선형 관계가 적다.
+- Age는 Shell weight, Diameter, Length에 대해 선형 비례한다.
+- Age 변수는 Shucked Weight와 상관 관계가 가장 적다.
+
+변수들 사이의 높은 상관 계수는 다중공선성을 초래할 수 있다. 그러므로 그것을 확인해야 하지만, 여기서는 그것을 하지 않을 것이다. 
+
+# 이상치 조정
+
+data = pd.get_dummies(data)
+dummy_data = data.copy()
+
+data.boxplot(rot = 90, figsize=(20,5))
+
+## Viscera weight
+
+var = 'Viscera weight'
+plt.scatter(x = data[var], y = data['age'])
+plt.grid(True)
+
+# outliers removal
+data.drop(data[(data['Viscera weight']>0.5) & (data['age']<20)].index, inplace=True)
+data.drop(data[(data['Viscera weight']<0.5) & (data['age']>25)].index, inplace=True)
+
+## Shell weight
+
+var = 'Shell weight'
+plt.scatter(x=data[var], y=data['age'])
+plt.grid(True)
+
+data.drop(data[(data['Shell weight']>0.6) & (data['age']<25)].index, inplace=True)
+data.drop(data[(data['Shell weight']>0.8) & (data['age']>25)].index, inplace=True)
+
+## Shucked weight
+
+var = 'Shucked weight'
+plt.scatter(x=data[var], y=data['age'])
+plt.grid(True)
+
+data.drop(data[(data['Shucked weight']>=1) & (data['age']<20)].index, inplace = True)
+data.drop(data[(data['Shucked weight']<1) & (data['age']>20)].index, inplace = True)
+
+## Whole weight
+
+var='Whole weight'
+plt.scatter(x=data[var], y=data['age'])
+plt.grid(True)
+
+data.drop(data[(data['Whole weight']>=2.5) & (data['age'] < 25)].index, inplace=True)
+data.drop(data[(data['Whole weight']<2.5) & (data['age'] > 25)].index, inplace=True)
+
+## Diameter
+
+var='Diameter'
+plt.scatter(x=data[var], y=data['age'])
+plt.grid(True)
+
+
+data.drop(data[(data['Diameter']<0.1) & (data['age']<5)].index, inplace=True)
+data.drop(data[(data['Diameter']<0.6) & (data['age']>25)].index, inplace=True)
+data.drop(data[(data['Diameter']>=0.6) & (data['age']<25)].index, inplace=True)
+
+## Height
+
+var='Height'
+plt.scatter(x=data[var], y=data['age'])
+plt.grid(True)
+
+data.drop(data[(data['Height']>0.4) & (data['age']<15)].index, inplace=True)
+data.drop(data[(data['Height']<0.4) & (data['age']>25)].index, inplace=True)
+
+## Length
+
+var='Length'
+plt.scatter(x=data[var], y=data['age'])
+plt.grid(True)
+
+data.drop(data[(data['Length']<0.1) & (data['age']<5)].index, inplace=True)
+data.drop(data[(data['Length']<0.8) & (data['age']>25)].index, inplace=True)
+data.drop(data[(data['Length']>=0.8) & (data['age']<25)].index, inplace=True)
+
+# Preprocessing, Modeling, Evaluation
+## 전처리, 모델링, 평가
+---
+모든 데이터 모델링 파이프라인에서 따르는 기본 단계는 다음과 같다. 
+ - pre-processing
+ - suitable model selection
+     - =적합한 모델 선택
+ - hyperparameters tunning using GridSearchCV
+ - evaluation
+
+X = data.drop('age', axis=1)
+y = data['age']
+
+standardScale = StandardScaler()
+standardScale.fit_transform(X)
+
+selectkbest = SelectKBest()
+X_new = selectkBest.fit_transform(X, y)
+
+X_train, X_test, y_train, y_test = train_test_split(X_new, y, test_size=.25)
+
+np.random.seed(10)
+
+def rmse_cv(model, X_train, y):
+    rmse =- (cross_val_score(model, X_train, y, scoring='neg_mean_squared_error', cv=5))
+    return (rmse*100)
+
+models = [LinearRegression(),
+         Ridge(),
+         SVR(),
+         RandomForestRegressor(),
+         GradientBoostingRegressor(),
+         KNeighborsRegressor(n_neighbors=4)]
+
+names=['LR','Ridge','svm','GNB','RF','GB','KNN']
+
+for model, name in zip(models, names):
+    score = rmse_cv(model, X_train, y_train)
+    print("{} : {:.6f}, {:4f}".format(name, score.mean(), score.std()))
+
+위에서 모델 별 성능을 확인했다. 
+
+그럼 어떤 모델을 선택해야 할까? 답은 [**Occam's razor principle** 철학](https://simple.wikipedia.org/wiki/Occam%27s_razor)에 있다.    
+예를 들어, 한 사건에 두 가지 설명(A,B)이 있다고 가정해보자. 이 때는 간단한 설명이 더 낫다고 볼 수 있다(A).
+더 복잡한 설명일수록 가정할 것이 많아지며, 이는 설명력이 낮아지기 때문이라고 할 수 있다.
+
+따라서 여기서는 가장 간단한 릿지 모델부터 시작하도록 하며, 이유는 다음과 같다.
+ - Feature Dimension is less
+     - 변수의 차원 값이 작다.
+ - No missing values
+ - Few categorical featuers
+
+def modelfit(alg, dtrain, predictors, performCV=True, printFeatureImportance=True, cv_folds=5):
+     # Fit the algorithm on the data
+    alg.fit(dtrain[predictors], dtrain['age'])
+
+    # Predict training set:
+    dtrain_predictions = alg.predict(dtrain[predictors])
+    # dtrain_predprob = alg.predict_proba(dtrain[predictors])[:,1]
+    
+    # Perform cross-validation:
+    if performCV:
+        cv_score = -cross_val_score(alg, dtrain[predictors], dtrain['age'], cv=cv_folds, scoring='r2')
+    
+        
+   # Print model report:
+    print('\n Model Report')
+    print("RMSE : %.4g" % mean_squared_error(dtrain['age'].values, dtrain_predictions))
+    print("R2 Score (Train): %f" % r2_score(dtrain['age'], dtrain_predictions))
+    
+    if performCV:
+        print("CV Score : Mean = %.7g | Std - %.7g | Min - %.7g | Max - %.7g" % (np.mean(cv_score), np.std(cv_score), np.min(cv_score), np.max(cv_score)))
+    
+    # Print Feature Importance:
+    if printFeatureImportance:
+        feat_imp = pd.Series(alg.coef_, predictors).sort_values(ascending=False)
+        plt.figure(figsize=(20,4))
+        feat_imp.plot(kind='bar', title = 'Feature Importances')
+        plt.ylabel('Feature Importance Score')
+
+# Base Model
+predictors = [x for x in data.columns if x not in ['age']]
+lrm0 = Ridge(random_state=10)
+modelfit(lrm0, data, predictors)
+
+# Hyperparameter tunning using GridSearchCV
+
+# Let's do hyperparameter tunning using GridsearchCV
+from sklearn.model_selection import GridSearchCV
+
+param = {'alpha' : [0.01, 0.1, 1, 10, 100],
+        'solver' : ['auto','svd','cholesky','lsqr','sparse_cg','sag','saga']}
+glrm0 = GridSearchCV(estimator=Ridge(random_state=10,),
+                     param_grid=param, scoring='r2', cv=5, n_jobs=-1)
+glrm0.fit(X_train, y_train)
+glrm0.best_params_, glrm0.best_score_
+
+modelfit(Ridge(alpha=0.1, random_state=10), data, predictors)
+
+CV 점수는  약간 개선된 반면, R2_score는 감소해 기본 모델이 오버핏되었음을 나타낸다.  
+위 프로세스를 사용하면 여러 옵션을 사용해 훨씬 더 강력한 모델을 사용할 수 있으며, 이 프로세는 RF와 GB 등 다양한 모델에서 시도할 수 있다.  
+
+하이퍼파라미터 튜닝은 반복  프로세스이며 계속 진행할 수 있다.  
+이 커널에서는 전복 데이터셋의 EDA에 초점을 맞추고 있기 때문에 모델링은 [Modeling - Ablaone Age Prediction]()을 통해 진행된다. 
