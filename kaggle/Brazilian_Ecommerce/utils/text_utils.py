@@ -1,3 +1,5 @@
+# ref : https://github.com/GabrielBKaram/Customer-Segmentation-and-Sentiment-Analysis/blob/master/E-commerce%20-%20Customer%20Segmentation%20%26%20Sentiment%20Analysis.ipynb
+
 """
     Script criado para consolidar classes e funções customizadas para o tratamento de textos e treinamento
     de modelos de análise de sentimentos.
